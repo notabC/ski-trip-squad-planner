@@ -1,12 +1,190 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { initializeStorage, getCurrentUser, logoutUser, getUserGroups } from "@/services/localStorageService";
+import AuthForm from "@/components/AuthForm";
+import GroupForm from "@/components/GroupForm";
+import { User, Group } from "@/types";
+import { LogOut, PlusCircle, Snowflake, Users } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  
+  useEffect(() => {
+    // Initialize local storage with mock data
+    initializeStorage();
+    
+    // Check if user is already logged in
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+      const groups = getUserGroups(currentUser.id);
+      setUserGroups(groups);
+    }
+  }, []);
+  
+  const handleAuthenticated = () => {
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+      const groups = getUserGroups(currentUser.id);
+      setUserGroups(groups);
+    }
+  };
+  
+  const handleLogout = () => {
+    logoutUser();
+    setUser(null);
+    setUserGroups([]);
+  };
+  
+  const handleGroupCreated = (groupId: string) => {
+    // Redirect to the group dashboard
+    navigate(`/group/${groupId}`);
+  };
+  
+  const handleGroupSelected = (groupId: string) => {
+    navigate(`/group/${groupId}`);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background snow-bg">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Snowflake className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold gradient-text">Ski Trip Planner</h1>
+          </div>
+          
+          {user && (
+            <div className="flex items-center gap-4">
+              <div className="text-right text-sm hidden sm:block">
+                <p className="font-medium">{user.name}</p>
+                <p className="text-muted-foreground">{user.email}</p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </header>
+      
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        {!user ? (
+          <div className="grid md:grid-cols-2 gap-8 mt-8">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-bold gradient-text">
+                  Plan Your Perfect Ski Trip Together
+                </h2>
+                <p className="mt-4 text-lg text-muted-foreground">
+                  Make planning your next ski adventure with friends easy and fun.
+                  Vote on destinations, track who's joining, and manage payments all in one place.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Collaborative Decision Making</h3>
+                    <p className="text-muted-foreground">
+                      Everyone gets a vote on the destination
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Snowflake className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Curated Ski Destinations</h3>
+                    <p className="text-muted-foreground">
+                      Beautiful resorts with pricing and amenities
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <PlusCircle className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Simple Payment Tracking</h3>
+                    <p className="text-muted-foreground">
+                      Keep track of who has paid for the trip
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <AuthForm onAuthenticated={handleAuthenticated} />
+            </div>
+          </div>
+        ) : userGroups.length > 0 ? (
+          <div className="space-y-8">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Your Trip Groups</h2>
+              <Button 
+                onClick={() => setUserGroups([])}
+                variant="outline"
+              >
+                Create New Group
+              </Button>
+            </div>
+            
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {userGroups.map((group) => (
+                <Card key={group.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <CardTitle>{group.name}</CardTitle>
+                    <CardDescription>
+                      Join Code: {group.joinCode}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {group.members.length} {group.members.length === 1 ? "member" : "members"}
+                    </p>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => handleGroupSelected(group.id)}
+                    >
+                      View Group
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <GroupForm currentUser={user} onGroupCreated={handleGroupCreated} />
+        )}
+      </main>
+      
+      <footer className="bg-white border-t mt-12 py-8">
+        <div className="max-w-6xl mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} Ski Trip Planner. All rights reserved.</p>
+          <p className="mt-1">Made with ❄️ for ski enthusiasts everywhere</p>
+        </div>
+      </footer>
     </div>
   );
 };
