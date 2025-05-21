@@ -10,15 +10,16 @@ import { toast } from "@/components/ui/use-toast";
 const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !email) {
+    if (!name || !email || !password) {
       toast({
         title: "Missing information",
-        description: "Please provide both name and email",
+        description: "Please provide name, email and password",
         variant: "destructive",
       });
       return;
@@ -37,7 +38,7 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
         return;
       }
       
-      const user = await registerUser(name, email);
+      const user = await registerUser(name, email, password);
       
       if (!user) {
         throw new Error("Failed to register user");
@@ -92,6 +93,18 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
                 placeholder="john@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="********"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
                 required
               />
             </div>

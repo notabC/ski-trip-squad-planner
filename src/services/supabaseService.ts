@@ -4,7 +4,7 @@ import { User, Group, Trip, Vote, Participant, Destination } from "../types";
 import { v4 as uuidv4 } from "uuid";
 
 // Authentication methods
-export const registerUser = async (name: string, email: string): Promise<User | null> => {
+export const registerUser = async (name: string, email: string, password: string): Promise<User | null> => {
   // First, check if the user already exists in our users table
   const { data: existingUsers } = await supabase
     .from('users')
