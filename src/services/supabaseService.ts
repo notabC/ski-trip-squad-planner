@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { User, Group, Destination, Trip, Participant, Vote } from "@/types";
 
@@ -217,42 +216,82 @@ export const saveCurrentUser = (email: string): void => {
 
 // Group methods
 export const createGroup = async (name: string, creatorId: string): Promise<Group | null> => {
-  const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  
-  // Create new group
-  const { data: groupData, error: groupError } = await supabase
-    .from('groups')
-    .insert([
-      { name, creator_id: creatorId, join_code: joinCode }
-    ])
-    .select()
-    .single();
-  
-  if (groupError || !groupData) {
-    console.error('Error creating group:', groupError);
+  try {
+    // First, check if the user exists in the users table
+    const { data: userData } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', creatorId)
+      .maybeSingle();
+    
+    // If user doesn't exist in users table, create them
+    if (!userData) {
+      // Get user from auth
+      const { data: authUser } = await supabase.auth.getUser();
+      
+      if (!authUser || !authUser.user) {
+        console.error('Auth user not found');
+        return null;
+      }
+      
+      // Create user in users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([
+          { 
+            id: creatorId, 
+            name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
+            email: authUser.user.email || '' 
+          }
+        ]);
+      
+      if (userError) {
+        console.error('Error creating user record:', userError);
+        return null;
+      }
+    }
+    
+    // Now create the group
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Create new group
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .insert([
+        { name, creator_id: creatorId, join_code: joinCode }
+      ])
+      .select()
+      .single();
+    
+    if (groupError || !groupData) {
+      console.error('Error creating group:', groupError);
+      return null;
+    }
+    
+    // Add creator as a member
+    const { error: memberError } = await supabase
+      .from('group_members')
+      .insert([
+        { group_id: groupData.id, user_id: creatorId }
+      ]);
+    
+    if (memberError) {
+      console.error('Error adding member to group:', memberError);
+      // We could handle this better, but for now just return the group
+    }
+    
+    // Return in the format our app expects
+    return {
+      id: groupData.id,
+      name: groupData.name,
+      creatorId: groupData.creator_id,
+      members: [creatorId],
+      joinCode: groupData.join_code
+    };
+  } catch (error) {
+    console.error('Error in createGroup:', error);
     return null;
   }
-  
-  // Add creator as a member
-  const { error: memberError } = await supabase
-    .from('group_members')
-    .insert([
-      { group_id: groupData.id, user_id: creatorId }
-    ]);
-  
-  if (memberError) {
-    console.error('Error adding member to group:', memberError);
-    // We could handle this better, but for now just return the group
-  }
-  
-  // Return in the format our app expects
-  return {
-    id: groupData.id,
-    name: groupData.name,
-    creatorId: groupData.creator_id,
-    members: [creatorId],
-    joinCode: groupData.join_code
-  };
 };
 
 export const joinGroup = async (joinCode: string, userId: string): Promise<Group | null> => {
