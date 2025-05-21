@@ -1,4 +1,3 @@
-
 import React from "react";
 import { User, Participant, Trip } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -24,25 +23,40 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
   onUpdatePayment,
   totalPrice = 0,
 }) => {
-  const getStatusIcon = (status: Participant["status"]) => {
+  const getStatusBadge = (status: Participant["status"]) => {
     switch (status) {
       case "confirmed":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return (
+          <div className="flex items-center gap-1.5 text-green-600 bg-green-100 px-3 py-1 rounded font-medium shadow-sm">
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-sm">In</span>
+          </div>
+        );
       case "declined":
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return (
+          <div className="flex items-center gap-1.5 text-red-600 bg-red-100 px-3 py-1 rounded font-medium shadow-sm">
+            <XCircle className="h-4 w-4" />
+            <span className="text-sm">Out</span>
+          </div>
+        );
       default:
-        return <AlertCircle className="h-5 w-5 text-amber-500" />;
+        return (
+          <div className="flex items-center gap-1.5 text-amber-600 bg-amber-100 px-3 py-1 rounded font-medium shadow-sm">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Pending</span>
+          </div>
+        );
     }
   };
   
   const getPaymentStatusBadge = (status: Participant["paymentStatus"]) => {
     switch (status) {
       case "paid":
-        return <Badge className="bg-green-500">Paid</Badge>;
+        return <Badge className="px-3 py-1 bg-green-500 hover:bg-green-600">Paid</Badge>;
       case "partially_paid":
-        return <Badge className="bg-amber-500">Partial</Badge>;
+        return <Badge className="px-3 py-1 bg-amber-500 hover:bg-amber-600">Partial</Badge>;
       case "not_paid":
-        return <Badge className="bg-red-500/70">Not Paid</Badge>;
+        return <Badge className="px-3 py-1 bg-red-500 hover:bg-red-600">Not Paid</Badge>;
     }
   };
 
@@ -75,13 +89,13 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
               <div
                 key={user.id}
                 className={cn(
-                  "py-3 flex items-center justify-between",
+                  "py-3 flex flex-wrap items-center justify-between",
                   user.id === currentUserId ? "bg-secondary/20" : ""
                 )}
               >
                 <div className="flex items-center space-x-3">
                   <div className="flex-shrink-0">
-                    {getStatusIcon(participant.status)}
+                    {getStatusBadge(participant.status)}
                   </div>
                   <div>
                     <p className="font-medium">
@@ -91,37 +105,40 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-2 sm:mt-0">
                   {getPaymentStatusBadge(participant.paymentStatus)}
                   
                   {user.id === currentUserId && (
                     <>
-                      {participant.status === "pending" && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onUpdateStatus(user.id, "confirmed")}
-                            className="border-green-500 text-green-500 hover:bg-green-50"
-                          >
-                            I'm In
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onUpdateStatus(user.id, "declined")}
-                            className="border-red-500 text-red-500 hover:bg-red-50"
-                          >
-                            I'm Out
-                          </Button>
-                        </div>
+                      {/* Show "I'm In" button if not already confirmed */}
+                      {participant.status !== "confirmed" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onUpdateStatus(user.id, "confirmed")}
+                          className="border-green-500 text-green-500 hover:bg-green-50 focus:ring-2 focus:ring-green-500/20 active:bg-green-100"
+                        >
+                          I'm In
+                        </Button>
+                      )}
+                      
+                      {/* Show "I'm Out" button if not already declined */}
+                      {participant.status !== "declined" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onUpdateStatus(user.id, "declined")}
+                          className="border-red-500 text-red-500 hover:bg-red-50 focus:ring-2 focus:ring-red-500/20 active:bg-red-100"
+                        >
+                          I'm Out
+                        </Button>
                       )}
                       
                       {participant.status === "confirmed" && participant.paymentStatus !== "paid" && (
                         <Button
                           size="sm"
                           onClick={() => onUpdatePayment(user.id)}
-                          className="gap-1"
+                          className="gap-1 focus:ring-2 focus:ring-primary/20"
                         >
                           <DollarSign className="h-4 w-4" />
                           {participant.paymentStatus === "not_paid" ? 

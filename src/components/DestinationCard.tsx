@@ -1,10 +1,9 @@
-
 import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Destination, Vote } from "@/types";
-import { CalendarIcon, MapPinIcon, DollarSignIcon } from "lucide-react";
+import { CalendarIcon, MapPinIcon, DollarSignIcon, ThumbsUpIcon, UsersIcon } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 
 interface DestinationCardProps {
@@ -60,6 +59,12 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
         >
           {destination.difficulty.charAt(0).toUpperCase() + destination.difficulty.slice(1)}
         </Badge>
+        
+        {/* Vote count badge */}
+        <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1 rounded-md flex items-center gap-1.5 text-xs font-medium shadow-md">
+          <UsersIcon size={14} />
+          <span>{votesForDestination} {votesForDestination === 1 ? "vote" : "votes"}</span>
+        </div>
       </div>
       
       <CardHeader>
@@ -109,13 +114,11 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
           </div>
         )}
         
-        {isVotingClosed ? (
-          <div className="text-sm text-center font-medium">
-            {votesForDestination} {votesForDestination === 1 ? "vote" : "votes"} ({votePercentage}%)
-          </div>
-        ) : (
-          <div className="text-sm text-center">
-            {votesForDestination} {votesForDestination === 1 ? "vote" : "votes"}
+        {totalVotes > 0 && (
+          <div className="text-sm text-center font-medium flex items-center justify-center gap-1">
+            <div className="w-full bg-secondary/30 p-2 rounded-md">
+              {votesForDestination} {votesForDestination === 1 ? "vote" : "votes"} ({votePercentage}%)
+            </div>
           </div>
         )}
       </CardContent>
@@ -128,7 +131,12 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
             className={`w-full ${isVoted ? "bg-primary" : "bg-secondary hover:bg-secondary/80"}`}
             variant={isVoted ? "default" : "outline"}
           >
-            {isVoted ? "Voted" : "Vote"}
+            {isVoted ? (
+              <div className="flex items-center gap-1.5">
+                <ThumbsUpIcon size={16} />
+                <span>Voted</span>
+              </div>
+            ) : "Vote"}
           </Button>
         ) : (
           <Button

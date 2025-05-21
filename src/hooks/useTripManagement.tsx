@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { 
   getGroupById, 
@@ -30,9 +30,21 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   
+  // Use a ref to track when we're updating a participant's status
+  // This prevents the secondary useEffect from overriding our changes
+  const updatingParticipantRef = useRef(false);
+  const lastUpdatedUserIdRef = useRef<string | null>(null);
+  const lastUpdatedStatusRef = useRef<"confirmed" | "declined" | null>(null);
+  
   // Load all necessary data
   useEffect(() => {
     const loadData = async () => {
+      // Skip data loading if we're currently updating a participant
+      if (updatingParticipantRef.current) {
+        console.log("Skipping data load during participant update");
+        return;
+      }
+      
       setLoading(true);
       
       if (!groupId || !currentUser) {
@@ -105,21 +117,38 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         
         if (fetchedTrip) {
           // Ensure all members are included as participants
+          const memberIds = members.map(m => m.id);
+          let participantUserIds: string[] = [];
+          let updatedParticipants = [...(fetchedTrip.participants || [])];
+          
           if (fetchedTrip.participants) {
-            const memberIds = members.map(m => m.id);
-            const participantUserIds = fetchedTrip.participants.map(p => p.userId);
+            participantUserIds = fetchedTrip.participants.map(p => p.userId);
+            
+            // Special handling for recently updated participant status
+            if (lastUpdatedUserIdRef.current && lastUpdatedStatusRef.current) {
+              // If we recently updated a participant status, make sure it's preserved
+              const userId = lastUpdatedUserIdRef.current;
+              const status = lastUpdatedStatusRef.current;
+              
+              updatedParticipants = updatedParticipants.map(p => 
+                p.userId === userId ? { ...p, status } : p
+              );
+              
+              console.log(`Preserving status update for user ${userId} as ${status}`);
+              
+              // Reset refs once we've preserved the status
+              lastUpdatedUserIdRef.current = null;
+              lastUpdatedStatusRef.current = null;
+            }
             
             // Find members who are not yet participants
             const missingMembers = memberIds.filter(id => !participantUserIds.includes(id));
             
             if (missingMembers.length > 0) {
               console.log("Some members are not yet participants, they will be added:", missingMembers);
-              // In a real application, you would update the participants here
-              // For now, we'll just make sure they're included in the UI
-              const newParticipants = [...fetchedTrip.participants];
               
               for (const memberId of missingMembers) {
-                newParticipants.push({
+                updatedParticipants.push({
                   userId: memberId,
                   status: "pending",
                   paymentStatus: "not_paid"
@@ -128,9 +157,22 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
               
               fetchedTrip = {
                 ...fetchedTrip,
-                participants: newParticipants
+                participants: updatedParticipants
               };
             }
+          } else {
+            // If no participants exist, add all members as participants
+            console.log("No participants found, adding all members");
+            updatedParticipants = memberIds.map(id => ({
+              userId: id,
+              status: "pending",
+              paymentStatus: "not_paid"
+            }));
+            
+            fetchedTrip = {
+              ...fetchedTrip,
+              participants: updatedParticipants
+            };
           }
           
           setTrip(fetchedTrip);
@@ -175,25 +217,60 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
     
     try {
       console.log("Casting vote for destination:", destinationId);
-      await castVote(currentUser.id, destinationId);
-      setUserVote({
+      
+      // Set a flag to prevent concurrent effects from running
+      updatingParticipantRef.current = true;
+      
+      // Get the previous vote if it exists
+      const previousVote = userVote;
+      
+      // Optimistically update local state for immediate UI feedback
+      const newVote = {
         userId: currentUser.id,
         destinationId,
         timestamp: Date.now(),
-      });
+      };
       
-      // Update all votes
+      // Update the user's vote immediately
+      setUserVote(newVote);
+      
+      // Update the all votes array optimistically
+      let newAllVotes = [...allVotes];
+      
+      // If there was a previous vote, remove it from the local state
+      if (previousVote) {
+        newAllVotes = newAllVotes.filter(
+          vote => !(vote.userId === currentUser.id)
+        );
+      }
+      
+      // Add the new vote to the local state
+      newAllVotes.push(newVote);
+      setAllVotes(newAllVotes);
+      
+      console.log("Optimistically updated votes:", newAllVotes);
+      
+      // Actually save to database
+      await castVote(currentUser.id, destinationId);
+      
+      // Fetch updated votes from server to ensure consistency
       if (groupId) {
         const updatedVotes = await getVotesByGroupId(groupId);
         setAllVotes(updatedVotes);
-        console.log("Updated votes after casting vote:", updatedVotes);
+        console.log("Updated votes from server after casting vote:", updatedVotes);
       }
+      
+      // Clear the flag
+      updatingParticipantRef.current = false;
       
       toast({
         title: "Vote cast",
         description: "Your vote has been recorded",
       });
     } catch (error) {
+      // Clear the flag on error
+      updatingParticipantRef.current = false;
+      
       console.error("Error casting vote:", error);
       toast({
         title: "Error",
@@ -252,26 +329,60 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   
   // Handle updating participant status
   const handleUpdateStatus = async (userId: string, status: "confirmed" | "declined") => {
-    if (!trip) return;
+    if (!trip) {
+      console.error("Can't update status: No trip found");
+      return;
+    }
     
     try {
+      console.log(`Updating status for userId: ${userId} to ${status}`);
+      
+      // Set the flag to indicate we're updating a participant's status
+      updatingParticipantRef.current = true;
+      
+      // Store the updated values for reference
+      lastUpdatedUserIdRef.current = userId;
+      lastUpdatedStatusRef.current = status;
+      
+      // Immediately update the UI for better responsiveness
+      const updatedParticipants = trip.participants.map(p => 
+        p.userId === userId 
+          ? { ...p, status } 
+          : p
+      );
+      
+      setTrip({
+        ...trip,
+        participants: updatedParticipants
+      });
+      
+      // Then update in database
       const updatedTrip = await updateParticipantStatus(trip.id, userId, status);
+      
+      // Clear updating flag
+      updatingParticipantRef.current = false;
+      
       if (!updatedTrip) {
         toast({
           title: "Error",
-          description: "Failed to update status",
+          description: "Failed to update status on server",
           variant: "destructive",
         });
         return;
       }
       
-      setTrip(updatedTrip);
+      // We don't need to immediately update with server data as our optimistic update should be correct
+      // We'll just keep our optimistic update to prevent any flicker
+      // setTrip(updatedTrip);
       
       toast({
         title: "Status updated",
         description: `You've ${status === "confirmed" ? "joined" : "declined"} the trip`,
       });
     } catch (error) {
+      // Clear updating flag on error too
+      updatingParticipantRef.current = false;
+      
       console.error("Error updating participant status:", error);
       toast({
         title: "Error",
@@ -300,11 +411,29 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
     }
     
     try {
+      // Set updating flag
+      updatingParticipantRef.current = true;
+      
+      // Optimistic update
+      const updatedParticipants = trip.participants.map(p => 
+        p.userId === userId 
+          ? { ...p, paymentStatus: newStatus } 
+          : p
+      );
+      
+      setTrip({
+        ...trip,
+        participants: updatedParticipants
+      });
+      
       const updatedTrip = await updateParticipantPaymentStatus(
         trip.id,
         userId,
         newStatus
       );
+      
+      // Clear updating flag
+      updatingParticipantRef.current = false;
       
       if (!updatedTrip) {
         toast({
@@ -315,13 +444,17 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         return;
       }
       
-      setTrip(updatedTrip);
+      // We'll keep our optimistic update to prevent flicker
+      // setTrip(updatedTrip);
       
       toast({
         title: "Payment updated",
         description: toastMessage,
       });
     } catch (error) {
+      // Clear updating flag on error
+      updatingParticipantRef.current = false;
+      
       console.error("Error updating payment status:", error);
       toast({
         title: "Error",
@@ -333,9 +466,22 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
 
   // Format participants data
   const formattedParticipants = useMemo(() => {
-    if (!trip?.participants || !members || members.length === 0) {
-      console.warn("No participants or members available to format");
+    if (!trip?.participants) {
+      console.warn("No participants available to format");
       return [];
+    }
+
+    // If we have members but no participants, create participants for all members
+    if (trip.participants.length === 0 && members.length > 0) {
+      console.log("No participants but members exist, creating participants for all members");
+      return members.map(member => ({
+        user: member,
+        participant: {
+          userId: member.id,
+          status: "pending",
+          paymentStatus: "not_paid"
+        }
+      }));
     }
 
     const result = trip.participants.map(participant => {
@@ -370,8 +516,38 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
 
   // This will force-update the participants list when members or trip changes
   useEffect(() => {
-    // Just a placeholder to ensure the dependency array includes members and trip
-    console.log("Members or trip data changed, updating formatted participants");
+    // Skip if we're updating a participant to avoid race condition
+    if (updatingParticipantRef.current) {
+      console.log("Skipping participant sync during update");
+      return;
+    }
+    
+    // If we have members but they're not all in the trip participants, update the trip
+    if (trip && members.length > 0) {
+      const participantUserIds = trip.participants.map(p => p.userId);
+      const memberIds = members.map(m => m.id);
+      
+      const missingMembers = memberIds.filter(id => !participantUserIds.includes(id));
+      
+      if (missingMembers.length > 0) {
+        console.log("Found members not in participants list, updating trip:", missingMembers);
+        
+        const updatedParticipants = [...trip.participants];
+        
+        for (const memberId of missingMembers) {
+          updatedParticipants.push({
+            userId: memberId,
+            status: "pending",
+            paymentStatus: "not_paid"
+          });
+        }
+        
+        setTrip({
+          ...trip,
+          participants: updatedParticipants
+        });
+      }
+    }
   }, [members, trip]);
 
   return {

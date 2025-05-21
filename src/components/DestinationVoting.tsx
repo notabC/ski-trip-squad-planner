@@ -1,5 +1,4 @@
-
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import DestinationCard from "@/components/DestinationCard";
 import { Destination, Vote, User } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,9 +22,30 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
   onVote,
   isVotingClosed = false,
 }) => {
+  // Calculate vote counts once using useMemo to improve performance
+  const voteCounts = useMemo(() => {
+    // Create a map of destination IDs to vote counts
+    const counts: Record<string, number> = {};
+    
+    // Initialize with zero for all destinations
+    destinations.forEach(dest => {
+      counts[dest.id] = 0;
+    });
+    
+    // Count the votes
+    allVotes.forEach(vote => {
+      if (counts[vote.destinationId] !== undefined) {
+        counts[vote.destinationId]++;
+      }
+    });
+    
+    console.log("Calculated vote counts:", counts);
+    return counts;
+  }, [destinations, allVotes]);
+  
   // Get counts of votes for each destination
   const getVotesForDestination = (destinationId: string) => {
-    return allVotes.filter(vote => vote.destinationId === destinationId).length;
+    return voteCounts[destinationId] || 0;
   };
   
   // Debug logs to help identify issues
@@ -35,7 +55,8 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
     console.log("DestinationVoting - allVotes:", allVotes);
     console.log("DestinationVoting - members:", members);
     console.log("DestinationVoting - isVotingClosed:", isVotingClosed);
-  }, [destinations, userVote, allVotes, members, isVotingClosed]);
+    console.log("DestinationVoting - vote counts:", voteCounts);
+  }, [destinations, userVote, allVotes, members, isVotingClosed, voteCounts]);
 
   // If destinations is loading, show a loading skeleton
   if (!destinations) {
@@ -67,6 +88,9 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
     );
   }
 
+  // Calculate total votes for percentage calculation
+  const totalVotes = Object.values(voteCounts).reduce((sum, count) => sum + count, 0);
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">
@@ -80,7 +104,7 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
             destination={selectedDestination}
             onVote={onVote}
             userVote={userVote}
-            totalVotes={allVotes.length}
+            totalVotes={totalVotes}
             votesForDestination={getVotesForDestination(selectedDestination.id)}
             isVotingClosed={true}
             isSelected={true}
@@ -96,7 +120,7 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
               destination={destination}
               onVote={onVote}
               userVote={userVote}
-              totalVotes={allVotes.length}
+              totalVotes={totalVotes}
               votesForDestination={getVotesForDestination(destination.id)}
               isVotingClosed={false}
               isSelected={userVote?.destinationId === destination.id}
