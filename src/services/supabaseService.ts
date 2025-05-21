@@ -319,100 +319,203 @@ const createGroupWithUser = async (name: string, userId: string): Promise<Group 
 };
 
 export const joinGroup = async (joinCode: string, userId: string): Promise<Group | null> => {
-  // Find the group
-  const { data: groupData, error: groupError } = await supabase
-    .from('groups')
-    .select('*')
-    .eq('join_code', joinCode)
-    .single();
-  
-  if (groupError || !groupData) {
-    console.error('Error finding group:', groupError);
+  try {
+    console.log('Joining group with code:', joinCode, 'for user:', userId);
+    
+    // Find the group
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('join_code', joinCode)
+      .single();
+    
+    if (groupError || !groupData) {
+      console.error('Error finding group:', groupError);
+      return null;
+    }
+    
+    console.log('Found group:', groupData);
+    
+    // Check if user exists in the users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    let actualUserId = userId;
+    
+    if (!userData) {
+      console.log('User not found in users table, checking auth');
+      const { data: authUser } = await supabase.auth.getUser();
+      
+      if (!authUser || !authUser.user) {
+        console.error('Auth user not found');
+        return null;
+      }
+      
+      if (authUser.user.email) {
+        const { data: userByEmail } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authUser.user.email)
+          .maybeSingle();
+          
+        if (userByEmail) {
+          console.log('Found user by email:', userByEmail);
+          actualUserId = userByEmail.id;
+        } else {
+          // Create user record
+          console.log('Creating user record for auth user');
+          const { data: newUserData, error: insertUserError } = await supabase
+            .from('users')
+            .insert([{ 
+              id: userId, 
+              name: authUser.user.email.split('@')[0], 
+              email: authUser.user.email 
+            }])
+            .select()
+            .single();
+          
+          if (insertUserError) {
+            console.error('Error creating user record:', insertUserError);
+            return null;
+          }
+          
+          console.log('Created new user:', newUserData);
+          actualUserId = newUserData.id;
+        }
+      }
+    } else {
+      console.log('User found:', userData);
+    }
+    
+    // Check if user is already a member
+    const { data: existingMember, error: memberCheckError } = await supabase
+      .from('group_members')
+      .select('*')
+      .eq('group_id', groupData.id)
+      .eq('user_id', actualUserId);
+    
+    if (memberCheckError) {
+      console.error('Error checking membership:', memberCheckError);
+    }
+    
+    if (!existingMember || existingMember.length === 0) {
+      console.log('Adding user to group as new member');
+      // Add user to group
+      const { error: memberError } = await supabase
+        .from('group_members')
+        .insert([
+          { group_id: groupData.id, user_id: actualUserId }
+        ]);
+      
+      if (memberError) {
+        console.error('Error adding member to group:', memberError);
+        return null;
+      }
+      
+      console.log('User successfully added to group');
+    } else {
+      console.log('User is already a member of this group');
+    }
+    
+    // Get all members of the group
+    const { data: members, error: membersError } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupData.id);
+    
+    if (membersError) {
+      console.error('Error fetching group members:', membersError);
+    }
+    
+    const memberIds = members ? members.map(m => m.user_id) : [actualUserId];
+    
+    // Return in the format our app expects
+    return {
+      id: groupData.id,
+      name: groupData.name,
+      creatorId: groupData.creator_id,
+      members: memberIds,
+      joinCode: groupData.join_code
+    };
+  } catch (error) {
+    console.error('Error in joinGroup:', error);
     return null;
   }
-  
-  // Check if user is already a member
-  const { data: existingMember } = await supabase
-    .from('group_members')
-    .select('*')
-    .eq('group_id', groupData.id)
-    .eq('user_id', userId);
-  
-  if (!existingMember || existingMember.length === 0) {
-    // Add user to group
-    const { error: memberError } = await supabase
-      .from('group_members')
-      .insert([
-        { group_id: groupData.id, user_id: userId }
-      ]);
-    
-    if (memberError) {
-      console.error('Error adding member to group:', memberError);
-    }
-  }
-  
-  // Get all members of the group
-  const { data: members } = await supabase
-    .from('group_members')
-    .select('user_id')
-    .eq('group_id', groupData.id);
-  
-  const memberIds = members ? members.map(m => m.user_id) : [userId];
-  
-  // Return in the format our app expects
-  return {
-    id: groupData.id,
-    name: groupData.name,
-    creatorId: groupData.creator_id,
-    members: memberIds,
-    joinCode: groupData.join_code
-  };
 };
 
 export const getUserGroups = async (userId: string): Promise<Group[]> => {
-  // Get all group_ids where user is a member
-  const { data: membershipData, error: membershipError } = await supabase
-    .from('group_members')
-    .select('group_id')
-    .eq('user_id', userId);
-  
-  if (membershipError || !membershipData || membershipData.length === 0) {
-    return [];
-  }
-  
-  const groupIds = membershipData.map(m => m.group_id);
-  
-  // Get all groups
-  const { data: groupsData, error: groupsError } = await supabase
-    .from('groups')
-    .select('*')
-    .in('id', groupIds);
-  
-  if (groupsError || !groupsData) {
-    return [];
-  }
-  
-  // Get members for each group
-  const groups: Group[] = [];
-  
-  for (const group of groupsData) {
-    const { data: groupMembers } = await supabase
+  try {
+    // Get all group_ids where user is a member
+    const { data: membershipData, error: membershipError } = await supabase
       .from('group_members')
-      .select('user_id')
-      .eq('group_id', group.id);
+      .select('group_id')
+      .eq('user_id', userId);
     
-    const memberIds = groupMembers ? groupMembers.map(m => m.user_id) : [];
+    if (membershipError) {
+      console.error('Error fetching group memberships:', membershipError);
+      return [];
+    }
     
-    groups.push({
-      id: group.id,
-      name: group.name,
-      creatorId: group.creator_id,
-      members: memberIds,
-      joinCode: group.join_code
-    });
+    if (!membershipData || membershipData.length === 0) {
+      console.log('No group memberships found for user:', userId);
+      return [];
+    }
+    
+    const groupIds = membershipData.map(m => m.group_id);
+    console.log('Found group IDs:', groupIds);
+    
+    // Get all groups
+    const { data: groupsData, error: groupsError } = await supabase
+      .from('groups')
+      .select('*')
+      .in('id', groupIds);
+    
+    if (groupsError) {
+      console.error('Error fetching groups:', groupsError);
+      return [];
+    }
+    
+    if (!groupsData || groupsData.length === 0) {
+      console.log('No groups found for the membership IDs');
+      return [];
+    }
+    
+    console.log('Fetched groups data:', groupsData);
+    
+    // Get members for each group
+    const groups: Group[] = [];
+    
+    for (const group of groupsData) {
+      const { data: groupMembers, error: membersError } = await supabase
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', group.id);
+      
+      if (membersError) {
+        console.error('Error fetching group members:', membersError);
+        continue;
+      }
+      
+      const memberIds = groupMembers ? groupMembers.map(m => m.user_id) : [];
+      
+      groups.push({
+        id: group.id,
+        name: group.name,
+        creatorId: group.creator_id,
+        members: memberIds,
+        joinCode: group.join_code
+      });
+    }
+    
+    console.log('Processed groups with members:', groups);
+    return groups;
+  } catch (error) {
+    console.error('Unexpected error in getUserGroups:', error);
+    return [];
   }
-  
-  return groups;
 };
 
 export const getGroupById = async (groupId: string): Promise<Group | null> => {

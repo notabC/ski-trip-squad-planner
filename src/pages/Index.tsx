@@ -28,6 +28,7 @@ const Index = () => {
         const currentUser = await getCurrentUser();
         
         if (currentUser) {
+          console.log('Current user loaded:', currentUser);
           setUser(currentUser);
           loadUserGroups(currentUser.id);
         }
@@ -43,7 +44,9 @@ const Index = () => {
   
   const loadUserGroups = async (userId: string) => {
     try {
+      console.log('Loading groups for user:', userId);
       const groups = await getUserGroups(userId);
+      console.log('Loaded groups:', groups);
       setUserGroups(groups);
       setShowGroupForm(groups.length === 0); // Only show form if no groups exist
     } catch (error) {
@@ -72,6 +75,7 @@ const Index = () => {
   const handleGroupCreated = (groupId: string) => {
     // Reload groups before redirecting
     if (user) {
+      console.log('Group created, reloading user groups');
       loadUserGroups(user.id);
     }
     
