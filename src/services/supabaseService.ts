@@ -1168,6 +1168,15 @@ export const getTripByTripId = async (tripId: string): Promise<Trip | null> => {
 // Destination methods
 export const getAllDestinations = async (): Promise<Destination[]> => {
   try {
+    // During development, prefer to fetch from API to see real data
+    console.log('Fetching destinations from API');
+    const apiDestinations = await fetchSkiDestinations();
+    
+    // Add console log to show what we're returning
+    console.log(`Returning ${apiDestinations.length} destinations from API`);
+    return apiDestinations;
+    
+    /* Commented out database check for now to ensure we're using API data
     const { data, error } = await supabase
       .from('destinations')
       .select('*');
@@ -1216,6 +1225,7 @@ export const getAllDestinations = async (): Promise<Destination[]> => {
         }
       };
     });
+    */
   } catch (error) {
     console.error('Error in getAllDestinations:', error);
     return await fetchSkiDestinations();

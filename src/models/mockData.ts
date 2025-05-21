@@ -4,8 +4,8 @@ import { Destination, SkiResort, HotelAccommodation } from "../types";
 export const mockSkiResorts: SkiResort[] = [
   {
     id: "resort-1",
-    name: "Alpine Paradise",
-    location: "Chamonix, France",
+    name: "Alpine Paradise, Route de Melon",
+    location: "Abondance, France",
     description: "Experience the majesty of the French Alps with world-class slopes for all skill levels.",
     image: "/images/ski-resort-1.jpg",
     difficulty: "intermediate"

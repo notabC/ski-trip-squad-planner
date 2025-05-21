@@ -77,6 +77,11 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         if (!fetchedDestinations || fetchedDestinations.length === 0) {
           fetchedDestinations = await fetchSkiDestinations();
         }
+        
+        // Add logs to debug destination data
+        console.log("Loaded destinations from database or API:", fetchedDestinations);
+        console.log("Sample destination data:", fetchedDestinations[0]);
+        
         setDestinations(fetchedDestinations);
         
         // Handle User Vote

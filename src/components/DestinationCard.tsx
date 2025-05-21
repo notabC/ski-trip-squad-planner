@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Destination, Vote } from "@/types";
-import { CalendarIcon, MapPinIcon, DollarSignIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, HomeIcon } from "lucide-react";
-import { formatCurrency } from "@/utils/formatters";
+import { CalendarIcon, MapPinIcon, DollarSignIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, HomeIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { formatCurrency, parseHtml } from "@/utils/formatters";
 
 interface DestinationCardProps {
   destination: Destination;
@@ -25,6 +25,7 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
   isVotingClosed,
   isSelected = false,
 }) => {
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const isVoted = userVote?.destinationId === destination.id;
   const votePercentage = totalVotes > 0 ? Math.round((votesForDestination / totalVotes) * 100) : 0;
   
@@ -45,8 +46,8 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
     <Card className={`overflow-hidden transition-all duration-300 hover:shadow-lg ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}>
       <div className="relative h-48 overflow-hidden">
         <img
-          src={destination.resort.image}
-          alt={destination.resort.name}
+          src={destination.accommodation.image || destination.resort.image}
+          alt={destination.accommodation.name}
           className="w-full h-full object-cover"
         />
         {isSelected && (
@@ -70,7 +71,7 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
         <div className="space-y-1">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold line-clamp-1">
-              {destination.resort.name}
+              {destination.accommodation.name}
             </CardTitle>
             <span className="text-sm font-semibold text-primary">
               {formatCurrency(destination.price)}
@@ -85,21 +86,40 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
       <CardContent className="p-3 pt-0 space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
+            <BedDoubleIcon size={16} className="mb-1 text-orange-500" />
+            <span className="text-xs font-medium">Accommodation</span>
+            <span className="text-xs line-clamp-1">{destination.accommodation.name}</span>
+          </div>
+          <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
             <SnowflakeIcon size={16} className="mb-1 text-blue-500" />
             <span className="text-xs font-medium">Resort</span>
             <span className="text-xs line-clamp-1">{destination.resort.name}</span>
-          </div>
-          <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
-            <HomeIcon size={16} className="mb-1 text-orange-500" />
-            <span className="text-xs font-medium">Accommodation</span>
-            <span className="text-xs line-clamp-1">{destination.accommodation.name}</span>
           </div>
         </div>
         
         <div className="space-y-3">
           <div className="text-xs">
             <div className="font-medium mb-1">Accommodation Details:</div>
-            <p className="line-clamp-2 text-muted-foreground">{destination.accommodation.description}</p>
+            <div 
+              className={`${isDescriptionExpanded ? '' : 'line-clamp-3'} text-muted-foreground`}
+              {...parseHtml(destination.accommodation.description)}
+            ></div>
+            <button 
+              onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+              className="text-primary hover:text-primary/80 text-xs flex items-center mt-1 font-medium"
+            >
+              {isDescriptionExpanded ? (
+                <>
+                  <span>Show less</span>
+                  <ChevronUpIcon size={14} className="ml-0.5" />
+                </>
+              ) : (
+                <>
+                  <span>Show more</span>
+                  <ChevronDownIcon size={14} className="ml-0.5" />
+                </>
+              )}
+            </button>
           </div>
           
           {/* Amenities display */}

@@ -1,16 +1,39 @@
 import { mockDestinations, mockSkiResorts, mockAccommodations } from "@/models/mockData";
 import type { Destination, SkiResort, HotelAccommodation } from "@/types";
 
-// LiteAPI endpoint and key
-const LITE_API_BASE_URL = "https://api.liteapi.travel/hotels/v2";
-// In a real app, this would be stored in environment variables
+// Update API base URL to use our proxy and version 3.0 of the API
+const LITE_API_BASE_URL = "/api/liteapi/v3.0";
+// We no longer need to include the API key in the frontend code
+// as it will be added by the proxy server
 const LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || "";
 
-// Ski resort city IDs for LiteAPI (approximate city IDs)
-const SKI_RESORT_CITY_IDS = {
-  "Chamonix": "3000040033", // Chamonix (using Aspen ID as placeholder)
-  "Whistler": "3000040033", // Whistler (using Aspen ID as placeholder)
-  "Zermatt": "3000040033", // Zermatt (using Aspen ID as placeholder)
+/**
+ * Debug utility to safely check response content before parsing
+ */
+const debugResponse = async (response: Response, actionDescription: string): Promise<any> => {
+  const responseText = await response.text();
+  
+  console.log(`API Response for ${actionDescription} - Status: ${response.status}`);
+  console.log(`Response Headers:`, Object.fromEntries([...response.headers.entries()]));
+  
+  // Add more detailed debugging for the response content
+  if (!responseText || responseText.trim() === '') {
+    console.error('Empty response received');
+    console.log('Response URL:', response.url);
+    
+    // Instead of throwing an error, return an empty object with a data property
+    // This will prevent the app from crashing and allow fallback to mock data
+    return { data: [] };
+  }
+  
+  try {
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('Failed to parse response:', responseText.substring(0, 200) + '...');
+    console.log('Full response text:', responseText);
+    // Return empty data instead of throwing
+    return { data: [] };
+  }
 };
 
 /**
@@ -18,25 +41,22 @@ const SKI_RESORT_CITY_IDS = {
  */
 const transformHotelToAccommodation = (hotel: any): HotelAccommodation => {
   // Extract the first image URL or use a placeholder
-  const imageUrl = hotel.images && hotel.images.length > 0 
-    ? hotel.images[0].url 
+  const imageUrl = hotel.hotelImages && hotel.hotelImages.length > 0 
+    ? hotel.hotelImages[0] 
     : "/images/hotel-placeholder.jpg";
   
-  // Extract price information
+  // Extract price information - using average price if available
   let price = 899; // Default fallback price
-  if (hotel.price && hotel.price.lead && hotel.price.lead.amount) {
-    price = hotel.price.lead.amount;
-  }
   
   // Extract amenities
-  const amenities = hotel.facilities 
-    ? hotel.facilities.slice(0, 6).map((facility: any) => facility.name) 
+  const amenities = hotel.hotelFacilities 
+    ? hotel.hotelFacilities.slice(0, 6) 
     : ["Free WiFi", "Restaurant", "Spa Services", "Parking", "Fitness Center", "Breakfast"];
   
   return {
     id: `acc-api-${hotel.id || Math.random().toString(36).substr(2, 9)}`,
     name: hotel.name || "Mountain View Hotel",
-    description: hotel.description || "Comfortable accommodations with convenient access to nearby slopes.",
+    description: hotel.hotelDescription || "Comfortable accommodations with convenient access to nearby slopes.",
     image: imageUrl,
     price: price,
     amenities: amenities,
@@ -76,6 +96,37 @@ const createDestinationPackage = (
 };
 
 /**
+ * Extract country code from location string
+ */
+const getCountryCode = (location: string): string => {
+  const countries: Record<string, string> = {
+    "France": "FR",
+    "Canada": "CA",
+    "Switzerland": "CH",
+    "United States": "US",
+    "USA": "US"
+  };
+  
+  // Check if any country name is in the location string
+  for (const [country, code] of Object.entries(countries)) {
+    if (location.includes(country)) {
+      return code;
+    }
+  }
+  
+  return "US"; // Default fallback
+};
+
+/**
+ * Extract city name from location string
+ */
+const getCityName = (location: string): string => {
+  // Extract the city part (typically before the comma)
+  const cityPart = location.split(',')[0].trim();
+  return cityPart;
+};
+
+/**
  * Fetch hotels near a ski resort from LiteAPI
  */
 const fetchHotelsForResort = async (
@@ -91,49 +142,101 @@ const fetchHotelsForResort = async (
   }
   
   try {
-    const cityId = SKI_RESORT_CITY_IDS[resort.location.split(',')[0].trim()] || "3000040033";
+    // Extract city and country code from resort location
+    const cityName = getCityName(resort.location);
+    const countryCode = getCountryCode(resort.location);
     
-    const params = new URLSearchParams({
-      adults: "2",
-      children: "0",
-      checkIn,
-      checkOut,
-      currency: "USD",
-      cityId,
-      limit: limit.toString()
-    });
+    console.log(`Searching for hotels in ${cityName}, ${countryCode} for resort ${resort.name}`);
     
-    console.log(`Fetching hotels near ${resort.name} for dates ${checkIn} to ${checkOut}`);
-    
-    const response = await fetch(`${LITE_API_BASE_URL}/search?${params}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "liteapi-key": LITE_API_KEY
+    // Try fetching hotels using the hotels endpoint
+    try {
+      console.log(`API Key detected: ${LITE_API_KEY ? "Yes" : "No"}`);
+      
+      // Use the correct endpoint path that matches the working curl example
+      const hotelsEndpoint = `${LITE_API_BASE_URL}/data/hotels`;
+      
+      // Build search params
+      const hotelSearchParams = new URLSearchParams({
+        countryCode: countryCode,
+        cityName
+      });
+      
+      console.log(`Making API call to: ${hotelsEndpoint}?${hotelSearchParams.toString()}`);
+      
+      // Make the API call to get hotel list
+      const hotelResponse = await fetch(`${hotelsEndpoint}?${hotelSearchParams}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "accept": "application/json" // Add this header to match curl example
+        }
+      });
+      
+      console.log(`API Response status: ${hotelResponse.status}`);
+      console.log(`API Response headers:`, Object.fromEntries([...hotelResponse.headers.entries()]));
+      
+      if (!hotelResponse.ok) {
+        console.error(`Hotel search API response error: ${hotelResponse.status} - ${hotelResponse.statusText}`);
+        throw new Error(`Failed to fetch hotels: ${hotelResponse.statusText}`);
       }
-    });
-    
-    if (!response.ok) {
-      console.error("API response error:", response.status);
-      throw new Error("Failed to fetch from LiteAPI");
-    }
-    
-    const data = await response.json();
-    
-    if (!data.hotels || !Array.isArray(data.hotels) || data.hotels.length === 0) {
-      console.log(`No hotels found for ${resort.name}, using mock data`);
+      
+      const responseText = await hotelResponse.text();
+      console.log(`API Response body length: ${responseText.length} characters`);
+      console.log(`API Response body preview:`, responseText.substring(0, 100));
+      
+      if (!responseText || responseText.trim() === '') {
+        console.error('Empty response received from API');
+        throw new Error('Empty response received from API');
+      }
+      
+      let hotelData;
+      try {
+        hotelData = JSON.parse(responseText);
+        console.log(`Successfully parsed JSON response with ${hotelData.data?.length || 0} hotels`);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError);
+        console.log('Response text preview:', responseText.substring(0, 200));
+        throw new Error(`Invalid JSON response: ${parseError.message}`);
+      }
+      
+      if (!hotelData.data || !Array.isArray(hotelData.data) || hotelData.data.length === 0) {
+        console.log(`No hotels found in API response for ${resort.name} in ${cityName}`);
+        throw new Error('No hotels found in API response');
+      }
+      
+      // We got hotels! Transform them to our format
+      console.log(`Successfully found ${hotelData.data.length} hotels for ${resort.name}`);
+      
+      // Take a subset of the hotels
+      const hotelsToTransform = hotelData.data.slice(0, limit);
+      
+      // Transform API hotel format to our format
+      const accommodations = hotelsToTransform.map((hotel: any): HotelAccommodation => {
+        return {
+          id: `acc-api-${hotel.id}`,
+          name: hotel.name || "Mountain Hotel",
+          description: hotel.hotelDescription || "Comfortable accommodations near slopes.",
+          image: hotel.main_photo || "/images/hotel-placeholder.jpg",
+          price: 899, // Default price
+          amenities: hotel.facilityIds 
+            ? ["Free WiFi", "Restaurant", "Spa Services", "Fitness Center", "Breakfast"] 
+            : ["Free WiFi", "Parking", "Restaurant"],
+          hotelId: hotel.id
+        };
+      });
+      
+      return accommodations;
+      
+    } catch (apiError) {
+      console.error(`API Error while searching for ${resort.name}:`, apiError);
+      console.log(`Falling back to mock data for ${resort.name} due to API error`);
       return mockAccommodations.filter(acc => 
         acc.id.startsWith(`acc-${resort.id.split('-')[1]}`));
     }
     
-    // Transform hotel data to our HotelAccommodation format
-    return data.hotels
-      .filter((hotel: any) => hotel.name && hotel.id)
-      .map(transformHotelToAccommodation);
-    
   } catch (error) {
     console.error(`Error fetching hotels for ${resort.name}:`, error);
-    console.log("Using mock accommodations as fallback");
+    console.log(`Using mock accommodations as fallback for ${resort.name}`);
     return mockAccommodations.filter(acc => 
       acc.id.startsWith(`acc-${resort.id.split('-')[1]}`));
   }
@@ -145,7 +248,7 @@ const fetchHotelsForResort = async (
 export const fetchSkiDestinations = async (): Promise<Destination[]> => {
   console.log("Fetching ski destinations with accommodations...");
   
-  // Use mock resorts
+  // Use mock resorts as our base ski resorts
   const skiResorts = mockSkiResorts;
   
   // Set dates for the packages (next winter season)
@@ -159,8 +262,9 @@ export const fetchSkiDestinations = async (): Promise<Destination[]> => {
     const destinationPromises = skiResorts.map(async (resort) => {
       // Fetch hotels for this resort
       const hotels = await fetchHotelsForResort(resort, startDate, endDate);
+      console.log(`Found ${hotels.length} hotels for resort ${resort.name} from API`);
       
-      // Create destination packages for each hotel
+      // Create destination packages for each hotel - always use real API data when available
       return hotels.map(hotel => 
         createDestinationPackage(resort, hotel, startDate, endDate)
       );
@@ -176,6 +280,10 @@ export const fetchSkiDestinations = async (): Promise<Destination[]> => {
       console.log("No destinations found, using mock data");
       return mockDestinations;
     }
+    
+    console.log(`Successfully created ${destinations.length} destination packages from API data`);
+    const sampleDestination = destinations[0];
+    console.log(`Sample destination: ${sampleDestination.resort.name} with accommodation: ${sampleDestination.accommodation.name}`);
     
     return destinations;
     
