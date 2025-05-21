@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -79,19 +80,24 @@ const GroupDashboard = () => {
     );
   }
   
+  const totalPrice = selectedDestination?.price || 0;
+  
   return (
     <div className="min-h-screen bg-background">
       {/* Group Dashboard Header */}
       <GroupDashboardHeader 
-        groupName={group?.name || "Loading..."} 
+        groupName={group?.name || "Loading..."}
         onBack={() => navigate("/")} 
+        currentUser={currentUser}
       />
       
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         {/* Trip Status Header */}
         <TripStatusHeader 
-          tripStatus={trip?.status || "voting"} 
+          tripStatus={trip?.status || "voting"}
           onFinalizeVoting={handleFinalizeVoting}
+          group={group}
+          membersCount={members?.length || 0}
         />
         
         <Separator />
@@ -112,6 +118,9 @@ const GroupDashboard = () => {
           <TripSummary
             destination={selectedDestination}
             confirmedCount={confirmedCount}
+            trip={trip}
+            group={group}
+            members={members}
           />
         )}
         
@@ -122,6 +131,9 @@ const GroupDashboard = () => {
           participants={formattedParticipants}
           onUpdateStatus={handleUpdateStatus}
           onUpdatePayment={handleUpdatePayment}
+          currentUserId={currentUser.id}
+          trip={trip}
+          totalPrice={totalPrice}
         />
       </main>
     </div>

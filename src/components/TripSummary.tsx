@@ -3,16 +3,16 @@ import React from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Destination, Trip, Group, User } from "@/types";
-import { CalendarIcon, MapPinIcon, UsersIcon, VoteIcon } from "lucide-react";
+import { CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/utils/formatters";
 
 interface TripSummaryProps {
   destination?: Destination;
-  trip: Trip;
-  group: Group;
-  members: User[];
-  confirmedCount: number;
+  trip?: Trip;
+  group?: Group;
+  members?: User[];
+  confirmedCount?: number;
   onFinalizeVoting?: () => void;
 }
 
@@ -21,7 +21,7 @@ const TripSummary: React.FC<TripSummaryProps> = ({
   trip,
   group,
   members,
-  confirmedCount,
+  confirmedCount = 0,
   onFinalizeVoting,
 }) => {
   if (!destination) {
@@ -34,45 +34,26 @@ const TripSummary: React.FC<TripSummaryProps> = ({
           <p className="text-muted-foreground">
             No destination information available yet. Vote to select a destination!
           </p>
-          
-          {trip.status === "voting" && onFinalizeVoting && (
-            <div className="flex items-center justify-between rounded-md bg-secondary/30 p-3 mt-4">
-              <div className="flex items-center">
-                <VoteIcon className="h-5 w-5 mr-2 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Voting in progress</p>
-                  <p className="text-xs text-muted-foreground">
-                    Finalize when everyone has voted
-                  </p>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={onFinalizeVoting}
-              >
-                Finalize
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
     );
   }
   
-  const startDate = new Date(destination.dates.start).toLocaleDateString(undefined, {
+  const startDate = new Date(destination.dates?.start || destination.start_date).toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
   });
   
-  const endDate = new Date(destination.dates.end).toLocaleDateString(undefined, {
+  const endDate = new Date(destination.dates?.end || destination.end_date).toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
   });
   
   const totalNights = Math.round(
-    (new Date(destination.dates.end).getTime() - new Date(destination.dates.start).getTime()) / 
+    (new Date(destination.dates?.end || destination.end_date).getTime() - 
+     new Date(destination.dates?.start || destination.start_date).getTime()) / 
     (1000 * 60 * 60 * 24)
   );
 
@@ -105,12 +86,14 @@ const TripSummary: React.FC<TripSummaryProps> = ({
           <div className="flex items-center text-sm text-muted-foreground">
             <UsersIcon className="h-4 w-4 mr-1" />
             <span>
-              {confirmedCount} of {members.length} confirmed
+              {confirmedCount} of {members?.length || 0} confirmed
             </span>
           </div>
-          <Badge variant="outline" className="bg-secondary">
-            {group.name}
-          </Badge>
+          {group && (
+            <Badge variant="outline" className="bg-secondary">
+              {group.name}
+            </Badge>
+          )}
         </div>
         
         <div className="pt-2 border-t">
@@ -123,10 +106,9 @@ const TripSummary: React.FC<TripSummaryProps> = ({
           </div>
         </div>
         
-        {trip.status === "voting" && (
+        {trip?.status === "voting" && onFinalizeVoting && (
           <div className="flex items-center justify-between rounded-md bg-secondary/30 p-3">
             <div className="flex items-center">
-              <VoteIcon className="h-5 w-5 mr-2 text-primary" />
               <div>
                 <p className="text-sm font-medium">Voting in progress</p>
                 <p className="text-xs text-muted-foreground">
@@ -134,19 +116,17 @@ const TripSummary: React.FC<TripSummaryProps> = ({
                 </p>
               </div>
             </div>
-            {onFinalizeVoting && (
-              <Button
-                size="sm"
-                onClick={onFinalizeVoting}
-              >
-                Finalize
-              </Button>
-            )}
+            <Button
+              size="sm"
+              onClick={onFinalizeVoting}
+            >
+              Finalize
+            </Button>
           </div>
         )}
       </CardContent>
       
-      {trip.status === "confirmed" && (
+      {trip?.status === "confirmed" && (
         <CardFooter className="bg-primary/10 flex justify-center p-4">
           <div className="text-center">
             <p className="text-sm font-medium">This trip has been confirmed!</p>

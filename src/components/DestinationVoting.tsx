@@ -1,15 +1,16 @@
 
 import React from "react";
 import DestinationCard from "@/components/DestinationCard";
-import { Destination, Vote } from "@/types";
+import { Destination, Vote, User } from "@/types";
 
 interface DestinationVotingProps {
   destinations: Destination[];
-  selectedDestination: Destination | null;
+  selectedDestination?: Destination | null;
   userVote: Vote | null;
   allVotes: Vote[];
+  members?: User[]; // Added this to make it optional
   onVote: (destinationId: string) => void;
-  isVotingClosed: boolean;
+  isVotingClosed?: boolean;
 }
 
 const DestinationVoting: React.FC<DestinationVotingProps> = ({
@@ -17,8 +18,9 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
   selectedDestination,
   userVote,
   allVotes,
+  members,
   onVote,
-  isVotingClosed,
+  isVotingClosed = false,
 }) => {
   // Get counts of votes for each destination
   const getVotesForDestination = (destinationId: string) => {

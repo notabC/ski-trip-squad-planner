@@ -8,21 +8,21 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface ParticipantsListProps {
-  trip: Trip;
+  trip?: Trip;
   participants: Array<{ user: User; participant: Participant }>;
-  currentUserId: string;
+  currentUserId?: string;
   onUpdateStatus: (userId: string, status: "confirmed" | "declined") => void;
   onUpdatePayment: (userId: string) => void;
-  totalPrice: number;
+  totalPrice?: number;
 }
 
 const ParticipantsList: React.FC<ParticipantsListProps> = ({
   trip,
   participants,
-  currentUserId,
+  currentUserId = "",
   onUpdateStatus,
   onUpdatePayment,
-  totalPrice,
+  totalPrice = 0,
 }) => {
   const getStatusIcon = (status: Participant["status"]) => {
     switch (status) {
