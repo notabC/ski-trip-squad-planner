@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { User, Group, Destination, Trip, Participant, Vote } from "@/types";
 
@@ -234,20 +235,28 @@ export const createGroup = async (name: string, creatorId: string): Promise<Grou
         return null;
       }
       
-      // Create user in users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert([
-          { 
-            id: creatorId, 
-            name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
-            email: authUser.user.email || '' 
-          }
-        ]);
-      
-      if (userError) {
-        console.error('Error creating user record:', userError);
-        return null;
+      try {
+        // Create user in users table but handle potential conflicts
+        const { error: userError } = await supabase
+          .from('users')
+          .upsert([
+            { 
+              id: creatorId, 
+              name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
+              email: authUser.user.email || '' 
+            }
+          ], { 
+            onConflict: 'id', 
+            ignoreDuplicates: true 
+          });
+        
+        if (userError) {
+          console.error('Error upserting user record:', userError);
+          // Continue anyway - the user might already exist
+        }
+      } catch (userInsertError) {
+        console.error('Exception during user upsert:', userInsertError);
+        // Continue anyway - we'll try to create the group
       }
     }
     

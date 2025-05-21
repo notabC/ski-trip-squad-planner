@@ -49,7 +49,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
       console.error("Group creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to create group. Please try again.",
+        description: "Failed to create group. Please try refreshing the page and try again.",
         variant: "destructive",
       });
     } finally {
@@ -93,7 +93,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
       console.error("Group join error:", error);
       toast({
         title: "Error",
-        description: "Failed to join group. Please try again.",
+        description: "Failed to join group. Please try refreshing the page and try again.",
         variant: "destructive",
       });
     } finally {
