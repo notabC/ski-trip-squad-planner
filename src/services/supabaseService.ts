@@ -13,7 +13,7 @@ export const registerUser = async (name: string, email: string): Promise<User | 
   
   if (existingUsers && existingUsers.length > 0) {
     // User exists, return the user
-    return existingUsers[0] as User;
+    return existingUsers[0] as unknown as User;
   }
   
   // Create a new user
@@ -30,7 +30,7 @@ export const registerUser = async (name: string, email: string): Promise<User | 
     return null;
   }
   
-  return data as User;
+  return data as unknown as User;
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
@@ -50,7 +50,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
     return null;
   }
   
-  return data as User;
+  return data as unknown as User;
 };
 
 export const logoutUser = (): void => {

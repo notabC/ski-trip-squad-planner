@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/services/supabaseService";
 import { User } from "@/types";
 import GroupDashboardHeader from "@/components/GroupDashboardHeader";
