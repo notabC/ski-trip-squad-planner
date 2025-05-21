@@ -15,6 +15,7 @@ import {
   updateParticipantPaymentStatus,
   getDestinationById
 } from "@/services/supabaseService";
+import { fetchSkiDestinations } from "@/services/apiService";
 import type { Group, User, Destination, Trip, Participant, Vote } from "@/types";
 
 export const useTripManagement = (groupId: string | undefined, currentUser: User | null) => {
@@ -56,10 +57,18 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         setMembers(fetchedMembers);
         console.log("Fetched members:", fetchedMembers);
         
-        // Get all destinations
-        const fetchedDestinations = await getAllDestinations();
+        // Get all destinations - first try from database, then API with mock data fallback
+        let fetchedDestinations = await getAllDestinations();
+        console.log("Database destinations:", fetchedDestinations);
+        
+        if (!fetchedDestinations || fetchedDestinations.length === 0) {
+          console.log("No destinations in database, fetching from API/mock...");
+          fetchedDestinations = await fetchSkiDestinations();
+          console.log("API/Mock destinations:", fetchedDestinations);
+        }
+        
         setDestinations(fetchedDestinations);
-        console.log("Fetched destinations:", fetchedDestinations);
+        console.log("Final destinations set:", fetchedDestinations);
         
         // Get user's vote
         if (currentUser) {
@@ -95,9 +104,13 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         console.error("Error loading trip data:", error);
         toast({
           title: "Error",
-          description: "Failed to load trip information.",
+          description: "Failed to load trip information. Using fallback data.",
           variant: "destructive",
         });
+        
+        // Ensure we have destinations even if there's an error
+        const fallbackDestinations = await fetchSkiDestinations();
+        setDestinations(fallbackDestinations);
       } finally {
         setLoading(false);
       }

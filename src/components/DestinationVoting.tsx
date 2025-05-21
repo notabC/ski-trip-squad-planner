@@ -1,7 +1,8 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import DestinationCard from "@/components/DestinationCard";
 import { Destination, Vote, User } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DestinationVotingProps {
   destinations: Destination[];
@@ -28,21 +29,39 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
   };
   
   // Debug logs to help identify issues
-  console.log("DestinationVoting - destinations:", destinations);
-  console.log("DestinationVoting - userVote:", userVote);
-  console.log("DestinationVoting - allVotes:", allVotes);
-  console.log("DestinationVoting - members:", members);
-  console.log("DestinationVoting - isVotingClosed:", isVotingClosed);
+  useEffect(() => {
+    console.log("DestinationVoting - destinations:", destinations);
+    console.log("DestinationVoting - userVote:", userVote);
+    console.log("DestinationVoting - allVotes:", allVotes);
+    console.log("DestinationVoting - members:", members);
+    console.log("DestinationVoting - isVotingClosed:", isVotingClosed);
+  }, [destinations, userVote, allVotes, members, isVotingClosed]);
+
+  // If destinations is being loaded, show a loading skeleton
+  if (!destinations) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">
+          {isVotingClosed ? "Selected Destination" : "Vote for a Destination"}
+        </h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-[400px] w-full rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // If no destinations are available, show a message
-  if (!destinations || destinations.length === 0) {
+  if (destinations.length === 0) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">
           {isVotingClosed ? "Selected Destination" : "Vote for a Destination"}
         </h2>
         <div className="p-6 bg-muted rounded-lg text-center">
-          <p>No destinations available for voting.</p>
+          <p>No destinations available for voting. Please check back later.</p>
         </div>
       </div>
     );

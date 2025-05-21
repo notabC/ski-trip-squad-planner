@@ -58,6 +58,15 @@ const transformHotelToDestination = (hotel: any): Destination => {
  * Fetch ski destinations from LiteAPI
  */
 export const fetchSkiDestinations = async (): Promise<Destination[]> => {
+  console.log("Fetching ski destinations...");
+  
+  // Always return mock data as fallback initially
+  // Remove this line if you want to attempt the API call first
+  console.log("Using mock data for destinations");
+  return mockDestinations;
+  
+  // Uncomment below if you want to try API first, then fallback
+  /*
   if (!LITE_API_KEY) {
     console.log("No API key provided, using mock data");
     return mockDestinations;
@@ -113,4 +122,5 @@ export const fetchSkiDestinations = async (): Promise<Destination[]> => {
     console.log("Using mock data as fallback");
     return mockDestinations;
   }
+  */
 };
