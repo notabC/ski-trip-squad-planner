@@ -61,10 +61,18 @@ const GroupDashboard = () => {
     handleVote,
     handleFinalizeVoting,
     handleUpdateStatus,
-    handleUpdatePayment
+    handleUpdatePayment,
+    loading: tripLoading
   } = useTripManagement(groupId, currentUser);
   
-  if (loading) {
+  // Debug logs to help identify issues
+  console.log("GroupDashboard - destinations:", destinations);
+  console.log("GroupDashboard - userVote:", userVote);
+  console.log("GroupDashboard - allVotes:", allVotes);
+  console.log("GroupDashboard - trip status:", trip?.status);
+  console.log("GroupDashboard - group:", group);
+  
+  if (loading || tripLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p>Loading...</p>
@@ -102,19 +110,21 @@ const GroupDashboard = () => {
         
         <Separator />
         
-        {/* Destination Voting */}
-        {trip?.status === "voting" && (
+        {/* Destination Voting - ensure all props are passed correctly */}
+        {(!trip || trip.status === "voting") && (
           <DestinationVoting
-            destinations={destinations}
+            destinations={destinations || []}
+            selectedDestination={selectedDestination}
             userVote={userVote}
-            allVotes={allVotes}
+            allVotes={allVotes || []}
             members={members}
             onVote={handleVote}
+            isVotingClosed={false}
           />
         )}
         
         {/* Trip Summary */}
-        {trip?.status !== "voting" && selectedDestination && (
+        {trip && trip.status !== "voting" && selectedDestination && (
           <TripSummary
             destination={selectedDestination}
             confirmedCount={confirmedCount}

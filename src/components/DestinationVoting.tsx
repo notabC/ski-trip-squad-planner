@@ -26,6 +26,27 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
   const getVotesForDestination = (destinationId: string) => {
     return allVotes.filter(vote => vote.destinationId === destinationId).length;
   };
+  
+  // Debug logs to help identify issues
+  console.log("DestinationVoting - destinations:", destinations);
+  console.log("DestinationVoting - userVote:", userVote);
+  console.log("DestinationVoting - allVotes:", allVotes);
+  console.log("DestinationVoting - members:", members);
+  console.log("DestinationVoting - isVotingClosed:", isVotingClosed);
+
+  // If no destinations are available, show a message
+  if (!destinations || destinations.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">
+          {isVotingClosed ? "Selected Destination" : "Vote for a Destination"}
+        </h2>
+        <div className="p-6 bg-muted rounded-lg text-center">
+          <p>No destinations available for voting.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -59,6 +80,7 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
               totalVotes={allVotes.length}
               votesForDestination={getVotesForDestination(destination.id)}
               isVotingClosed={false}
+              isSelected={userVote?.destinationId === destination.id}
             />
           ))}
         </div>

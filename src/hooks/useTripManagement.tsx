@@ -40,42 +40,55 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
       }
       
       try {
+        console.log("Loading trip management data for groupId:", groupId, "and userId:", currentUser.id);
+        
         const fetchedGroup = await getGroupById(groupId);
         if (!fetchedGroup) {
+          console.error("Group not found:", groupId);
           setLoading(false);
           return;
         }
         setGroup(fetchedGroup);
+        console.log("Fetched group:", fetchedGroup);
         
         // Get group members
         const fetchedMembers = await getGroupMembers(groupId);
         setMembers(fetchedMembers);
+        console.log("Fetched members:", fetchedMembers);
         
         // Get all destinations
         const fetchedDestinations = await getAllDestinations();
         setDestinations(fetchedDestinations);
+        console.log("Fetched destinations:", fetchedDestinations);
         
         // Get user's vote
-        const fetchedUserVote = await getUserVote(currentUser.id);
-        setUserVote(fetchedUserVote);
+        if (currentUser) {
+          const fetchedUserVote = await getUserVote(currentUser.id);
+          setUserVote(fetchedUserVote);
+          console.log("Fetched user vote:", fetchedUserVote);
+        }
         
         // Get all votes for this group
         const fetchedVotes = await getVotesByGroupId(groupId);
         setAllVotes(fetchedVotes);
+        console.log("Fetched all votes:", fetchedVotes);
         
         // Get or create the trip for this group
         let fetchedTrip = await getGroupTrip(groupId);
         if (!fetchedTrip) {
+          console.log("No trip found, creating new trip");
           fetchedTrip = await createTrip(groupId);
         }
         
         if (fetchedTrip) {
           setTrip(fetchedTrip);
+          console.log("Trip data:", fetchedTrip);
           
           // If the trip has a selected destination, load it
           if (fetchedTrip.selectedDestinationId) {
             const fetchedDestination = await getDestinationById(fetchedTrip.selectedDestinationId);
             setSelectedDestination(fetchedDestination);
+            console.log("Selected destination:", fetchedDestination);
           }
         }
       } catch (error) {
@@ -95,9 +108,17 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   
   // Handle voting
   const handleVote = async (destinationId: string) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to vote.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
+      console.log("Casting vote for destination:", destinationId);
       await castVote(currentUser.id, destinationId);
       setUserVote({
         userId: currentUser.id,
@@ -106,8 +127,11 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
       });
       
       // Update all votes
-      const updatedVotes = await getVotesByGroupId(groupId || "");
-      setAllVotes(updatedVotes);
+      if (groupId) {
+        const updatedVotes = await getVotesByGroupId(groupId);
+        setAllVotes(updatedVotes);
+        console.log("Updated votes after casting vote:", updatedVotes);
+      }
       
       toast({
         title: "Vote cast",
@@ -125,9 +149,17 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   
   // Handle finalizing the voting
   const handleFinalizeVoting = async () => {
-    if (!groupId) return;
+    if (!groupId) {
+      toast({
+        title: "Error",
+        description: "Group ID is missing.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
+      console.log("Finalizing voting for group:", groupId);
       const updatedTrip = await finalizeVoting(groupId);
       if (!updatedTrip) {
         toast({
@@ -139,11 +171,13 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
       }
       
       setTrip(updatedTrip);
+      console.log("Trip updated after finalizing voting:", updatedTrip);
       
       // Load the selected destination
       if (updatedTrip.selectedDestinationId) {
         const selectedDest = await getDestinationById(updatedTrip.selectedDestinationId);
         setSelectedDestination(selectedDest);
+        console.log("Selected destination after finalizing:", selectedDest);
         
         toast({
           title: "Voting finalized",
