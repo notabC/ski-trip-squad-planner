@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { User, Group, Destination, Trip } from "@/types";
+import { User, Group, Destination, Trip, Participant, Vote } from "@/types";
 
 // Auth functions
 export const registerUser = async (name: string, email: string, password: string): Promise<User | null> => {
