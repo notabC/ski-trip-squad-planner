@@ -37,7 +37,7 @@ const DestinationVoting: React.FC<DestinationVotingProps> = ({
     console.log("DestinationVoting - isVotingClosed:", isVotingClosed);
   }, [destinations, userVote, allVotes, members, isVotingClosed]);
 
-  // If destinations is being loaded, show a loading skeleton
+  // If destinations is loading, show a loading skeleton
   if (!destinations) {
     return (
       <div className="space-y-4">

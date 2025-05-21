@@ -175,15 +175,16 @@ export const getCurrentUser = async (): Promise<User | null> => {
         if (!data) {
           const authUser = sessionData.session.user;
           
-          // First check if a user with the same email exists
-          const { data: existingUser } = await supabase
+          // First check if user exists with same email
+          const { data: emailUser } = await supabase
             .from("users")
             .select("*")
             .eq("email", authUser.email)
             .maybeSingle();
             
-          if (existingUser) {
-            return existingUser;
+          if (emailUser) {
+            console.log('Found user with same email:', emailUser);
+            return emailUser;
           }
           
           // Insert new user
@@ -207,8 +208,8 @@ export const getCurrentUser = async (): Promise<User | null> => {
             }
             
             return newUserData;
-          } catch (insertError) {
-            console.error("Error creating user record:", insertError);
+          } catch (error) {
+            console.error("Error creating user record:", error);
             // Return basic user object based on auth data as fallback
             return newUser;
           }
@@ -533,6 +534,31 @@ export const joinGroup = async (joinCode: string, userId: string): Promise<Group
       }
       
       console.log('User successfully added to group');
+      
+      // Also add user to trip participants if trip exists
+      const { data: tripData } = await supabase
+        .from('trips')
+        .select('id')
+        .eq('group_id', groupData.id)
+        .maybeSingle();
+        
+      if (tripData) {
+        console.log('Found trip for group, adding user as participant');
+        const { error: participantError } = await supabase
+          .from('participants')
+          .insert([
+            { 
+              trip_id: tripData.id, 
+              user_id: actualUserId,
+              status: 'pending',
+              payment_status: 'not_paid'
+            }
+          ]);
+          
+        if (participantError) {
+          console.error('Error adding user as participant:', participantError);
+        }
+      }
     } else {
       console.log('User is already a member of this group');
     }
@@ -830,10 +856,12 @@ export const createTrip = async (groupId: string): Promise<Trip | null> => {
     .eq('group_id', groupId);
   
   if (!groupMembers || groupMembers.length === 0) {
+    console.error('No members found for group:', groupId);
     return null;
   }
   
   const memberIds = groupMembers.map(m => m.user_id);
+  console.log('Creating trip with members:', memberIds);
   
   // Create trip
   const { data: tripData, error: tripError } = await supabase
@@ -1192,4 +1220,25 @@ export const finalizeVoting = async (groupId: string): Promise<Trip | null> => {
   
   // Return the updated trip
   return getGroupTrip(groupId);
+};
+
+// Add a new function to get user by ID
+export const getUserById = async (userId: string): Promise<User | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (error || !data) {
+      console.error('Error fetching user by ID:', error);
+      return null;
+    }
+    
+    return data as User;
+  } catch (error) {
+    console.error('Error in getUserById:', error);
+    return null;
+  }
 };

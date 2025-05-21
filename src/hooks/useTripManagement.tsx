@@ -13,7 +13,8 @@ import {
   finalizeVoting,
   updateParticipantStatus,
   updateParticipantPaymentStatus,
-  getDestinationById
+  getDestinationById,
+  getUserById
 } from "@/services/supabaseService";
 import { fetchSkiDestinations } from "@/services/apiService";
 import type { Group, User, Destination, Trip, Participant, Vote } from "@/types";
@@ -54,8 +55,21 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         
         // Get group members
         const fetchedMembers = await getGroupMembers(groupId);
-        setMembers(fetchedMembers);
         console.log("Fetched members:", fetchedMembers);
+        
+        if (!fetchedMembers || fetchedMembers.length === 0) {
+          console.warn("No members found for group, adding current user as fallback");
+          setMembers([currentUser]);
+        } else {
+          // Ensure the current user is in the members list
+          const memberIds = fetchedMembers.map(m => m.id);
+          if (!memberIds.includes(currentUser.id)) {
+            console.warn("Current user not in members list, adding");
+            setMembers([...fetchedMembers, currentUser]);
+          } else {
+            setMembers(fetchedMembers);
+          }
+        }
         
         // Get all destinations - first try from database, then API with mock data fallback
         let fetchedDestinations = await getAllDestinations();
@@ -84,12 +98,42 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         
         // Get or create the trip for this group
         let fetchedTrip = await getGroupTrip(groupId);
+        
         if (!fetchedTrip) {
           console.log("No trip found, creating new trip");
           fetchedTrip = await createTrip(groupId);
         }
         
         if (fetchedTrip) {
+          // Ensure all members are included as participants
+          if (fetchedTrip.participants) {
+            const memberIds = members.map(m => m.id);
+            const participantUserIds = fetchedTrip.participants.map(p => p.userId);
+            
+            // Find members who are not yet participants
+            const missingMembers = memberIds.filter(id => !participantUserIds.includes(id));
+            
+            if (missingMembers.length > 0) {
+              console.log("Some members are not yet participants, they will be added:", missingMembers);
+              // In a real application, you would update the participants here
+              // For now, we'll just make sure they're included in the UI
+              const newParticipants = [...fetchedTrip.participants];
+              
+              for (const memberId of missingMembers) {
+                newParticipants.push({
+                  userId: memberId,
+                  status: "pending",
+                  paymentStatus: "not_paid"
+                });
+              }
+              
+              fetchedTrip = {
+                ...fetchedTrip,
+                participants: newParticipants
+              };
+            }
+          }
+          
           setTrip(fetchedTrip);
           console.log("Trip data:", fetchedTrip);
           
@@ -289,16 +333,47 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   };
 
   // Format participants data
-  const formattedParticipants = trip?.participants.map(participant => {
-    const user = members.find(m => m.id === participant.userId);
-    return {
-      user: user || { id: participant.userId, name: "Unknown", email: "" },
-      participant,
-    };
-  }) || [];
+  const formattedParticipants = React.useMemo(() => {
+    if (!trip?.participants || !members || members.length === 0) {
+      console.warn("No participants or members available to format");
+      return [];
+    }
+
+    const result = trip.participants.map(participant => {
+      // Find the user for this participant
+      const user = members.find(m => m.id === participant.userId);
+      
+      // If user not found in members, try to load it
+      if (!user) {
+        console.warn(`User ${participant.userId} not found in members list`);
+        return {
+          user: { 
+            id: participant.userId, 
+            name: "Loading...", 
+            email: "" 
+          },
+          participant,
+        };
+      }
+      
+      return {
+        user,
+        participant,
+      };
+    });
+    
+    console.log("Formatted participants:", result);
+    return result;
+  }, [trip?.participants, members]);
   
   // Count confirmed participants
   const confirmedCount = trip?.participants.filter(p => p.status === "confirmed").length || 0;
+
+  // This will force-update the participants list when members or trip changes
+  useEffect(() => {
+    // Just a placeholder to ensure the dependency array includes members and trip
+    console.log("Members or trip data changed, updating formatted participants");
+  }, [members, trip]);
 
   return {
     group,

@@ -29,7 +29,14 @@ const GroupDashboard = () => {
         const user = await getCurrentUser();
         if (user) {
           setCurrentUser(user);
+          console.log("Current user loaded:", user);
         } else {
+          console.error("No user found, redirecting to home");
+          toast({
+            title: "Not logged in",
+            description: "You must be logged in to view this group.",
+            variant: "destructive",
+          });
           navigate("/");
         }
       } catch (error) {
@@ -66,11 +73,10 @@ const GroupDashboard = () => {
   } = useTripManagement(groupId, currentUser);
   
   // Debug logs to help identify issues
-  console.log("GroupDashboard - destinations:", destinations);
-  console.log("GroupDashboard - userVote:", userVote);
-  console.log("GroupDashboard - allVotes:", allVotes);
-  console.log("GroupDashboard - trip status:", trip?.status);
-  console.log("GroupDashboard - group:", group);
+  console.log("GroupDashboard - currentUser:", currentUser);
+  console.log("GroupDashboard - members:", members);
+  console.log("GroupDashboard - trip participants:", trip?.participants);
+  console.log("GroupDashboard - formattedParticipants:", formattedParticipants);
   
   if (loading || tripLoading) {
     return (
