@@ -1098,21 +1098,28 @@ export const getDestinationById = async (id: string): Promise<Destination | null
 
 // Voting methods
 export const castVote = async (userId: string, destinationId: string): Promise<void> => {
-  // First delete any existing votes by this user
-  await supabase
+  const { error: deleteError } = await supabase
     .from('votes')
     .delete()
     .eq('user_id', userId);
-  
-  // Then insert the new vote
-  const { error } = await supabase
+  if (deleteError) {
+    console.error('Error deleting existing vote:', JSON.stringify(deleteError, null, 2));
+    throw deleteError;
+  }
+
+  const { error: insertError } = await supabase
     .from('votes')
     .insert([
-      { user_id: userId, destination_id: destinationId }
-    ]);
-  
-  if (error) {
-    console.error('Error casting vote:', error);
+      {
+        user_id: userId,
+        destination_id: destinationId,
+        timestamp: new Date().toISOString() // satisfy NOT NULL constraint
+      }
+    ])
+    .select();
+  if (insertError) {
+    console.error('Error casting vote (inserting new vote):', JSON.stringify(insertError, null, 2));
+    throw insertError;
   }
 };
 
@@ -1152,12 +1159,8 @@ export const getUserVote = async (userId: string): Promise<Vote | null> => {
     .from('votes')
     .select('*')
     .eq('user_id', userId)
-    .single();
-  
-  if (error || !data) {
-    return null;
-  }
-  
+    .maybeSingle(); // allow 0 rows without 406
+  if (error || !data) return null;
   return {
     userId: data.user_id,
     destinationId: data.destination_id,
