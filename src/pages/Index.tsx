@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showGroupForm, setShowGroupForm] = useState(false);
   
   useEffect(() => {
     const loadUserData = async () => {
@@ -27,8 +29,7 @@ const Index = () => {
         
         if (currentUser) {
           setUser(currentUser);
-          const groups = await getUserGroups(currentUser.id);
-          setUserGroups(groups);
+          loadUserGroups(currentUser.id);
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -40,13 +41,22 @@ const Index = () => {
     loadUserData();
   }, []);
   
+  const loadUserGroups = async (userId: string) => {
+    try {
+      const groups = await getUserGroups(userId);
+      setUserGroups(groups);
+      setShowGroupForm(groups.length === 0); // Only show form if no groups exist
+    } catch (error) {
+      console.error("Error loading user groups:", error);
+    }
+  };
+  
   const handleAuthenticated = async () => {
     try {
       const currentUser = await getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
-        const groups = await getUserGroups(currentUser.id);
-        setUserGroups(groups);
+        loadUserGroups(currentUser.id);
       }
     } catch (error) {
       console.error("Error after authentication:", error);
@@ -60,12 +70,25 @@ const Index = () => {
   };
   
   const handleGroupCreated = (groupId: string) => {
+    // Reload groups before redirecting
+    if (user) {
+      loadUserGroups(user.id);
+    }
+    
     // Redirect to the group dashboard
     navigate(`/group/${groupId}`);
   };
   
   const handleGroupSelected = (groupId: string) => {
     navigate(`/group/${groupId}`);
+  };
+
+  const handleCreateNewGroup = () => {
+    setShowGroupForm(true);
+  };
+  
+  const handleCancelGroupCreation = () => {
+    setShowGroupForm(false);
   };
 
   if (loading) {
@@ -161,12 +184,18 @@ const Index = () => {
               <AuthForm onAuthenticated={handleAuthenticated} />
             </div>
           </div>
-        ) : userGroups.length > 0 ? (
+        ) : showGroupForm ? (
+          <GroupForm 
+            currentUser={user} 
+            onGroupCreated={handleGroupCreated} 
+            onCancel={handleCancelGroupCreation} 
+          />
+        ) : (
           <div className="space-y-8">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Your Trip Groups</h2>
               <Button 
-                onClick={() => setUserGroups([])}
+                onClick={handleCreateNewGroup}
                 variant="outline"
               >
                 Create New Group
@@ -199,8 +228,6 @@ const Index = () => {
               ))}
             </div>
           </div>
-        ) : (
-          <GroupForm currentUser={user} onGroupCreated={handleGroupCreated} />
         )}
       </main>
       

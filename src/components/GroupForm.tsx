@@ -14,9 +14,10 @@ import { InfoIcon } from "lucide-react";
 interface GroupFormProps {
   currentUser: User;
   onGroupCreated: (groupId: string) => void;
+  onCancel: () => void; // New prop for handling cancellation
 }
 
-const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) => {
+const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated, onCancel }) => {
   const [groupName, setGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,6 +167,15 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
             </TabsContent>
           </Tabs>
         </CardContent>
+        <CardFooter>
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={onCancel}
+          >
+            Back to Groups
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );
