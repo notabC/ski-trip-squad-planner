@@ -235,87 +235,68 @@ export const createGroup = async (name: string, creatorId: string): Promise<Grou
         return null;
       }
       
-      // Add user to the users table - using an INSERT instead of UPSERT to avoid email conflicts
-      const { data: insertUserData, error: insertUserError } = await supabase
-        .from('users')
-        .insert([{ 
-          id: creatorId, 
-          name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
-          email: authUser.user.email || '' 
-        }])
-        .select('*')
-        .single();
-      
-      if (insertUserError) {
-        console.error('Error creating user record:', insertUserError);
+      try {
+        // Add user to the users table - using an UPSERT to avoid conflicts
+        const { data: insertUserData, error: insertUserError } = await supabase
+          .from('users')
+          .upsert([{ 
+            id: creatorId, 
+            name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
+            email: authUser.user.email || '' 
+          }], { onConflict: 'id' })
+          .select();
         
-        // If the error is due to email conflict, try to find the existing user with this email
-        if (insertUserError.code === '23505' && authUser.user.email) {
-          const { data: existingUser } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', authUser.user.email)
-            .maybeSingle();
-          
-          // If we find a user with this email but different ID, we need to update our user record
-          if (existingUser) {
-            console.log('Found existing user with same email:', existingUser);
-            
-            // Create group with the existing user ID instead
-            return createGroupWithUser(name, existingUser.id);
-          }
+        if (insertUserError) {
+          console.error('Error upserting user record:', insertUserError);
+          // Continue with existing user if there's an error
         }
-        
-        return null;
+      } catch (error) {
+        console.error('Error in user creation:', error);
+        // Continue with group creation using the auth user id
       }
     }
     
-    return createGroupWithUser(name, creatorId);
+    // Generate join code
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Create new group
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .insert([
+        { name, creator_id: creatorId, join_code: joinCode }
+      ])
+      .select()
+      .single();
+    
+    if (groupError || !groupData) {
+      console.error('Error creating group:', groupError);
+      return null;
+    }
+    
+    // Add creator as a member
+    const { error: memberError } = await supabase
+      .from('group_members')
+      .insert([
+        { group_id: groupData.id, user_id: creatorId }
+      ]);
+    
+    if (memberError) {
+      console.error('Error adding member to group:', memberError);
+      // We could handle this better, but for now just return the group
+    }
+    
+    // Return in the format our app expects
+    return {
+      id: groupData.id,
+      name: groupData.name,
+      creatorId: groupData.creator_id,
+      members: [creatorId],
+      joinCode: groupData.join_code
+    };
   } catch (error) {
     console.error('Error in createGroup:', error);
     return null;
   }
-};
-
-// Helper function to create a group with a verified user ID
-const createGroupWithUser = async (name: string, userId: string): Promise<Group | null> => {
-  // Generate join code
-  const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  
-  // Create new group
-  const { data: groupData, error: groupError } = await supabase
-    .from('groups')
-    .insert([
-      { name, creator_id: userId, join_code: joinCode }
-    ])
-    .select()
-    .single();
-  
-  if (groupError || !groupData) {
-    console.error('Error creating group:', groupError);
-    return null;
-  }
-  
-  // Add creator as a member
-  const { error: memberError } = await supabase
-    .from('group_members')
-    .insert([
-      { group_id: groupData.id, user_id: userId }
-    ]);
-  
-  if (memberError) {
-    console.error('Error adding member to group:', memberError);
-    // We could handle this better, but for now just return the group
-  }
-  
-  // Return in the format our app expects
-  return {
-    id: groupData.id,
-    name: groupData.name,
-    creatorId: groupData.creator_id,
-    members: [userId],
-    joinCode: groupData.join_code
-  };
 };
 
 export const joinGroup = async (joinCode: string, userId: string): Promise<Group | null> => {
@@ -355,35 +336,37 @@ export const joinGroup = async (joinCode: string, userId: string): Promise<Group
       }
       
       if (authUser.user.email) {
-        const { data: userByEmail } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', authUser.user.email)
-          .maybeSingle();
-          
-        if (userByEmail) {
-          console.log('Found user by email:', userByEmail);
-          actualUserId = userByEmail.id;
-        } else {
-          // Create user record
-          console.log('Creating user record for auth user');
+        try {
+          // Try to upsert the user record
           const { data: newUserData, error: insertUserError } = await supabase
             .from('users')
-            .insert([{ 
+            .upsert([{ 
               id: userId, 
               name: authUser.user.email.split('@')[0], 
               email: authUser.user.email 
-            }])
+            }], { onConflict: 'id' })
             .select()
             .single();
-          
+            
           if (insertUserError) {
-            console.error('Error creating user record:', insertUserError);
-            return null;
+            console.error('Error upserting user record:', insertUserError);
+            // If upsert fails, try to find by email as fallback
+            const { data: userByEmail } = await supabase
+              .from('users')
+              .select('*')
+              .eq('email', authUser.user.email)
+              .maybeSingle();
+              
+            if (userByEmail) {
+              console.log('Found user by email:', userByEmail);
+              actualUserId = userByEmail.id;
+            }
+          } else if (newUserData) {
+            console.log('Created/updated user:', newUserData);
+            actualUserId = newUserData.id;
           }
-          
-          console.log('Created new user:', newUserData);
-          actualUserId = newUserData.id;
+        } catch (error) {
+          console.error('Error handling user record:', error);
         }
       }
     } else {
@@ -448,6 +431,32 @@ export const joinGroup = async (joinCode: string, userId: string): Promise<Group
 
 export const getUserGroups = async (userId: string): Promise<Group[]> => {
   try {
+    console.log('Getting user groups for:', userId);
+    
+    // First, ensure the user exists in the users table
+    const { data: userCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    if (!userCheck) {
+      // Try to get current user from auth
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData && authData.user && authData.user.id === userId) {
+        // User exists in auth but not in users table, try to create them
+        try {
+          await supabase.from('users').upsert({
+            id: userId,
+            name: authData.user.email ? authData.user.email.split('@')[0] : 'User',
+            email: authData.user.email || ''
+          }, { onConflict: 'id' });
+        } catch (error) {
+          console.error('Error creating missing user:', error);
+        }
+      }
+    }
+    
     // Get all group_ids where user is a member
     const { data: membershipData, error: membershipError } = await supabase
       .from('group_members')
@@ -461,11 +470,59 @@ export const getUserGroups = async (userId: string): Promise<Group[]> => {
     
     if (!membershipData || membershipData.length === 0) {
       console.log('No group memberships found for user:', userId);
-      return [];
+      
+      // As a fallback, check if user is a creator of any groups
+      const { data: createdGroups, error: createdError } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('creator_id', userId);
+      
+      if (createdError) {
+        console.error('Error fetching created groups:', createdError);
+        return [];
+      }
+      
+      if (!createdGroups || createdGroups.length === 0) {
+        console.log('No created groups found for user');
+        return [];
+      }
+      
+      console.log('Found groups where user is creator:', createdGroups);
+      
+      // For each group where user is creator, ensure they are also a member
+      const groups: Group[] = [];
+      
+      for (const group of createdGroups) {
+        // Check if user is already a member
+        const { data: existingMember } = await supabase
+          .from('group_members')
+          .select('*')
+          .eq('group_id', group.id)
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        // If not a member, add them
+        if (!existingMember) {
+          console.log('Adding creator as member for group:', group.id);
+          await supabase
+            .from('group_members')
+            .insert({ group_id: group.id, user_id: userId });
+        }
+        
+        groups.push({
+          id: group.id,
+          name: group.name,
+          creatorId: group.creator_id,
+          members: [userId], // Just the creator for now
+          joinCode: group.join_code
+        });
+      }
+      
+      return groups;
     }
     
     const groupIds = membershipData.map(m => m.group_id);
-    console.log('Found group IDs:', groupIds);
+    console.log('Found group IDs from memberships:', groupIds);
     
     // Get all groups
     const { data: groupsData, error: groupsError } = await supabase

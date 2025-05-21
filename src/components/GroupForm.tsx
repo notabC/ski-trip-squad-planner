@@ -14,7 +14,7 @@ import { InfoIcon } from "lucide-react";
 interface GroupFormProps {
   currentUser: User;
   onGroupCreated: (groupId: string) => void;
-  onCancel: () => void; // New prop for handling cancellation
+  onCancel: () => void; 
 }
 
 const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated, onCancel }) => {
@@ -38,6 +38,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated, onCa
     setIsSubmitting(true);
     
     try {
+      console.log('Creating group with user ID:', currentUser.id);
       const newGroup = await createGroup(groupName, currentUser.id);
       
       if (!newGroup) {
@@ -76,6 +77,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated, onCa
     setIsSubmitting(true);
     
     try {
+      console.log('Joining group with user ID:', currentUser.id);
       const group = await joinGroup(joinCode, currentUser.id);
       
       if (!group) {
