@@ -64,6 +64,19 @@ export const signInUser = async (email: string, password: string): Promise<User 
         // If user doesn't exist in users table but does in auth, create a new user record
         if (!userData) {
           const authUser = data.user;
+          // First check if a user with same email already exists
+          const { data: existingUser } = await supabase
+            .from("users")
+            .select("*")
+            .eq("email", authUser.email)
+            .maybeSingle();
+            
+          // If email already exists, return that user
+          if (existingUser) {
+            return existingUser;
+          }
+          
+          // Otherwise create a new user
           const newUser = {
             id: authUser.id,
             name: authUser.email ? authUser.email.split('@')[0] : 'User', // Use part of email as name
@@ -72,15 +85,21 @@ export const signInUser = async (email: string, password: string): Promise<User 
           
           const { data: newUserData, error: insertError } = await supabase
             .from("users")
-            .insert([newUser])
+            .upsert([newUser], { onConflict: 'id' })
             .select()
-            .single();
+            .maybeSingle();
             
           if (insertError) {
-            throw insertError;
+            console.error("Error creating user record:", insertError);
+            // Return basic user instead of throwing to ensure login still works
+            return {
+              id: authUser.id,
+              name: authUser.email ? authUser.email.split('@')[0] : 'User',
+              email: authUser.email || ''
+            };
           }
           
-          return newUserData;
+          return newUserData || newUser;
         }
         
         return userData;
@@ -140,50 +159,72 @@ export const getCurrentUser = async (): Promise<User | null> => {
     const { data: sessionData } = await supabase.auth.getSession();
     
     if (sessionData?.session?.user) {
-      // Get user data from our users table
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", sessionData.session.user.id)
-        .maybeSingle();
-      
-      if (error) {
-        throw error;
-      }
-      
-      // If user doesn't exist in users table but does in auth, create a new user record
-      if (!data) {
-        const authUser = sessionData.session.user;
-        const newUser = {
-          id: authUser.id,
-          name: authUser.email ? authUser.email.split('@')[0] : 'User', // Use part of email as name
-          email: authUser.email || ''
-        };
+      try {
+        // Try to get user data from our users table
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", sessionData.session.user.id)
+          .maybeSingle();
         
-        try {
-          const { data: newUserData, error: insertError } = await supabase
+        if (error) {
+          console.error("Error fetching user from users table:", error);
+        }
+        
+        // If user doesn't exist in users table but does in auth, create a new user record
+        if (!data) {
+          const authUser = sessionData.session.user;
+          
+          // First check if a user with the same email exists
+          const { data: existingUser } = await supabase
             .from("users")
-            .insert([newUser])
-            .select()
-            .single();
+            .select("*")
+            .eq("email", authUser.email)
+            .maybeSingle();
             
-          if (insertError) {
-            throw insertError;
+          if (existingUser) {
+            return existingUser;
           }
           
-          return newUserData;
-        } catch (insertError) {
-          console.error("Error creating user record:", insertError);
-          // Return basic user object based on auth data as fallback
-          return {
+          // Insert new user
+          const newUser = {
             id: authUser.id,
             name: authUser.email ? authUser.email.split('@')[0] : 'User',
             email: authUser.email || ''
           };
+          
+          try {
+            const { data: newUserData, error: insertError } = await supabase
+              .from("users")
+              .insert([newUser])
+              .select()
+              .single();
+              
+            if (insertError) {
+              console.error("Error creating user record:", insertError);
+              // Return basic user object as fallback
+              return newUser;
+            }
+            
+            return newUserData;
+          } catch (insertError) {
+            console.error("Error creating user record:", insertError);
+            // Return basic user object based on auth data as fallback
+            return newUser;
+          }
         }
+        
+        return data;
+      } catch (error) {
+        console.error("Error in getCurrentUser:", error);
+        // Fallback to auth user
+        const authUser = sessionData.session.user;
+        return {
+          id: authUser.id,
+          name: authUser.email ? authUser.email.split('@')[0] : 'User',
+          email: authUser.email || ''
+        };
       }
-      
-      return data;
     }
     
     // Check for current user in localStorage as fallback
@@ -218,43 +259,95 @@ export const saveCurrentUser = (email: string): void => {
 // Group methods
 export const createGroup = async (name: string, creatorId: string): Promise<Group | null> => {
   try {
-    // First, check if the user exists in the users table
-    const { data: userData } = await supabase
+    console.log('Creating group for user ID:', creatorId);
+    
+    // First, ensure the user exists in the users table
+    const { data: userCheck } = await supabase
       .from('users')
-      .select('*')
+      .select('id')
       .eq('id', creatorId)
       .maybeSingle();
     
-    // If user doesn't exist in users table, create them
-    if (!userData) {
+    if (!userCheck) {
+      console.log('User not found in users table, creating user record');
       // Get user from auth
       const { data: authUser } = await supabase.auth.getUser();
       
-      if (!authUser || !authUser.user) {
+      if (!authUser?.user) {
         console.error('Auth user not found');
         return null;
       }
       
-      try {
-        // Add user to the users table - using an UPSERT to avoid conflicts
-        const { data: insertUserData, error: insertUserError } = await supabase
-          .from('users')
-          .upsert([{ 
-            id: creatorId, 
-            name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
-            email: authUser.user.email || '' 
-          }], { onConflict: 'id' })
-          .select();
+      // First check if user exists with same email
+      const { data: emailUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', authUser.user.email)
+        .maybeSingle();
+      
+      if (emailUser) {
+        console.log('Found user with same email:', emailUser);
+        creatorId = emailUser.id;
+      } else {
+        // Insert the user into the users table
+        const newUser = { 
+          id: creatorId, 
+          name: authUser.user.email ? authUser.user.email.split('@')[0] : 'User', 
+          email: authUser.user.email || '' 
+        };
         
-        if (insertUserError) {
-          console.error('Error upserting user record:', insertUserError);
-          // Continue with existing user if there's an error
+        console.log('Creating new user record:', newUser);
+        
+        try {
+          const { data: insertedUser, error: insertError } = await supabase
+            .from('users')
+            .insert([newUser])
+            .select()
+            .single();
+            
+          if (insertError) {
+            console.error('Error creating user record:', insertError);
+            if (insertError.code === '23505') {
+              console.log('Duplicate key error, trying to fetch existing user');
+              // Email conflict - try to fetch user by email
+              const { data: existingUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', newUser.email)
+                .maybeSingle();
+                
+              if (existingUser) {
+                console.log('Found existing user by email:', existingUser);
+                creatorId = existingUser.id;
+              } else {
+                return null;
+              }
+            } else {
+              return null;
+            }
+          } else if (insertedUser) {
+            console.log('Created new user:', insertedUser);
+          }
+        } catch (error) {
+          console.error('Error in user creation:', error);
+          return null;
         }
-      } catch (error) {
-        console.error('Error in user creation:', error);
-        // Continue with group creation using the auth user id
       }
     }
+    
+    // Double-check that user exists
+    const { data: finalUserCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', creatorId)
+      .maybeSingle();
+      
+    if (!finalUserCheck) {
+      console.error('Failed to ensure user exists in database');
+      return null;
+    }
+    
+    console.log('Confirmed user exists in users table, proceeding with group creation');
     
     // Generate join code
     const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -273,6 +366,8 @@ export const createGroup = async (name: string, creatorId: string): Promise<Grou
       return null;
     }
     
+    console.log('Group created:', groupData);
+    
     // Add creator as a member
     const { error: memberError } = await supabase
       .from('group_members')
@@ -283,6 +378,8 @@ export const createGroup = async (name: string, creatorId: string): Promise<Grou
     if (memberError) {
       console.error('Error adding member to group:', memberError);
       // We could handle this better, but for now just return the group
+    } else {
+      console.log('Added creator as member to group');
     }
     
     // Return in the format our app expects
@@ -336,41 +433,78 @@ export const joinGroup = async (joinCode: string, userId: string): Promise<Group
       }
       
       if (authUser.user.email) {
-        try {
-          // Try to upsert the user record
-          const { data: newUserData, error: insertUserError } = await supabase
-            .from('users')
-            .upsert([{ 
-              id: userId, 
+        // First check if user exists with same email
+        const { data: emailUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authUser.user.email)
+          .maybeSingle();
+        
+        if (emailUser) {
+          console.log('Found user with same email:', emailUser);
+          actualUserId = emailUser.id;
+        } else {
+          try {
+            // Create new user record
+            const newUser = { 
+              id: actualUserId, 
               name: authUser.user.email.split('@')[0], 
               email: authUser.user.email 
-            }], { onConflict: 'id' })
-            .select()
-            .single();
+            };
             
-          if (insertUserError) {
-            console.error('Error upserting user record:', insertUserError);
-            // If upsert fails, try to find by email as fallback
-            const { data: userByEmail } = await supabase
+            console.log('Creating new user record:', newUser);
+            
+            const { data: insertedUser, error: insertError } = await supabase
               .from('users')
-              .select('*')
-              .eq('email', authUser.user.email)
-              .maybeSingle();
+              .insert([newUser])
+              .select()
+              .single();
               
-            if (userByEmail) {
-              console.log('Found user by email:', userByEmail);
-              actualUserId = userByEmail.id;
+            if (insertError) {
+              console.error('Error creating user record:', insertError);
+              if (insertError.code === '23505') {
+                console.log('Duplicate key error, trying to fetch existing user');
+                // Email conflict - try to fetch user by email
+                const { data: existingUser } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('email', newUser.email)
+                  .maybeSingle();
+                  
+                if (existingUser) {
+                  console.log('Found existing user by email:', existingUser);
+                  actualUserId = existingUser.id;
+                } else {
+                  return null;
+                }
+              } else {
+                return null;
+              }
+            } else if (insertedUser) {
+              console.log('Created new user:', insertedUser);
             }
-          } else if (newUserData) {
-            console.log('Created/updated user:', newUserData);
-            actualUserId = newUserData.id;
+          } catch (error) {
+            console.error('Error handling user record:', error);
+            return null;
           }
-        } catch (error) {
-          console.error('Error handling user record:', error);
         }
+      } else {
+        return null;
       }
     } else {
       console.log('User found:', userData);
+    }
+    
+    // Double-check that user exists
+    const { data: finalUserCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', actualUserId)
+      .maybeSingle();
+      
+    if (!finalUserCheck) {
+      console.error('Failed to ensure user exists in database');
+      return null;
     }
     
     // Check if user is already a member
@@ -443,18 +577,74 @@ export const getUserGroups = async (userId: string): Promise<Group[]> => {
     if (!userCheck) {
       // Try to get current user from auth
       const { data: authData } = await supabase.auth.getUser();
-      if (authData && authData.user && authData.user.id === userId) {
-        // User exists in auth but not in users table, try to create them
-        try {
-          await supabase.from('users').upsert({
-            id: userId,
-            name: authData.user.email ? authData.user.email.split('@')[0] : 'User',
-            email: authData.user.email || ''
-          }, { onConflict: 'id' });
-        } catch (error) {
-          console.error('Error creating missing user:', error);
+      
+      if (authData?.user && authData.user.id === userId) {
+        console.log('User exists in auth but not in users table, creating record');
+        
+        // First check if user exists with same email
+        const { data: emailUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authData.user.email)
+          .maybeSingle();
+        
+        if (emailUser) {
+          console.log('Found user with same email:', emailUser);
+          userId = emailUser.id;
+        } else {
+          try {
+            // Create user record
+            const newUser = {
+              id: userId,
+              name: authData.user.email ? authData.user.email.split('@')[0] : 'User',
+              email: authData.user.email || ''
+            };
+            
+            const { data: insertedUser, error: insertError } = await supabase
+              .from('users')
+              .insert([newUser])
+              .select()
+              .single();
+              
+            if (insertError) {
+              console.error('Error creating missing user:', insertError);
+              if (insertError.code === '23505') {
+                // Email conflict - try to fetch user by email
+                const { data: existingUser } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('email', newUser.email)
+                  .maybeSingle();
+                  
+                if (existingUser) {
+                  userId = existingUser.id;
+                } else {
+                  return [];
+                }
+              } else {
+                return [];
+              }
+            }
+          } catch (error) {
+            console.error('Error creating missing user:', error);
+            return [];
+          }
         }
+      } else {
+        return [];
       }
+    }
+    
+    // Double-check user exists now
+    const { data: finalUserCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (!finalUserCheck) {
+      console.error('Failed to ensure user exists in database');
+      return [];
     }
     
     // Get all group_ids where user is a member

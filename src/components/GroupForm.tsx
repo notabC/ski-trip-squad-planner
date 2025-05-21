@@ -8,8 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createGroup, joinGroup } from "@/services/supabaseService";
 import { User } from "@/types";
 import { toast } from "@/components/ui/use-toast";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { InfoIcon } from "lucide-react";
 
 interface GroupFormProps {
   currentUser: User;
@@ -21,7 +19,6 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated, onCa
   const [groupName, setGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
