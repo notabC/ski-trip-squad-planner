@@ -251,9 +251,9 @@ export const getAllDestinations = async () => {
   return destinations || [];
 };
 
-export const getDestinationById = (id: string): Destination | null => {
-  const destinations = getAllDestinations();
-  return destinations.find((d) => d.id === id) || null;
+export const getDestinationById = async (id: string): Promise<Destination | null> => {
+  const destinations = await getAllDestinations();
+  return destinations.find((d: Destination) => d.id === id) || null;
 };
 
 // Voting methods
