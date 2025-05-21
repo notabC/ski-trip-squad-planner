@@ -39,21 +39,21 @@ const TripSummary: React.FC<TripSummaryProps> = ({
     );
   }
   
-  const startDate = new Date(destination.dates?.start || destination.start_date).toLocaleDateString(undefined, {
+  const startDate = new Date(destination.dates?.start || "").toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
   });
   
-  const endDate = new Date(destination.dates?.end || destination.end_date).toLocaleDateString(undefined, {
+  const endDate = new Date(destination.dates?.end || "").toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
   });
   
   const totalNights = Math.round(
-    (new Date(destination.dates?.end || destination.end_date).getTime() - 
-     new Date(destination.dates?.start || destination.start_date).getTime()) / 
+    (new Date(destination.dates?.end || "").getTime() - 
+     new Date(destination.dates?.start || "").getTime()) / 
     (1000 * 60 * 60 * 24)
   );
 
