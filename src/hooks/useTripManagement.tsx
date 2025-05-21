@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { 
   getGroupById, 
@@ -333,7 +332,7 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   };
 
   // Format participants data
-  const formattedParticipants = React.useMemo(() => {
+  const formattedParticipants = useMemo(() => {
     if (!trip?.participants || !members || members.length === 0) {
       console.warn("No participants or members available to format");
       return [];
