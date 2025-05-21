@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/utils/formatters";
 
 interface TripSummaryProps {
-  destination: Destination;
+  destination?: Destination;
   trip: Trip;
   group: Group;
   members: User[];
@@ -24,6 +24,41 @@ const TripSummary: React.FC<TripSummaryProps> = ({
   confirmedCount,
   onFinalizeVoting,
 }) => {
+  if (!destination) {
+    return (
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-xl">Trip Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            No destination information available yet. Vote to select a destination!
+          </p>
+          
+          {trip.status === "voting" && onFinalizeVoting && (
+            <div className="flex items-center justify-between rounded-md bg-secondary/30 p-3 mt-4">
+              <div className="flex items-center">
+                <VoteIcon className="h-5 w-5 mr-2 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Voting in progress</p>
+                  <p className="text-xs text-muted-foreground">
+                    Finalize when everyone has voted
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={onFinalizeVoting}
+              >
+                Finalize
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+  
   const startDate = new Date(destination.dates.start).toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',

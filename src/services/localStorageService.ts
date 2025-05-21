@@ -1,7 +1,7 @@
-
 import { User, Group, Trip, Vote, Participant, Destination } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import { mockDestinations } from "../models/mockData";
+import { fetchSkiDestinations } from "./apiService";
 
 // Keys for localStorage
 const KEYS = {
@@ -230,8 +230,25 @@ export const updateParticipantPaymentStatus = (
 };
 
 // Destination methods
-export const getAllDestinations = (): Destination[] => {
-  return JSON.parse(localStorage.getItem(KEYS.DESTINATIONS) || "[]");
+export const getAllDestinations = async () => {
+  let destinations = null;
+  
+  try {
+    // Try to get destinations from local storage first
+    destinations = JSON.parse(localStorage.getItem('destinations') || 'null');
+    
+    // If no destinations in local storage, or we want fresh data, fetch from API
+    if (!destinations || destinations.length === 0) {
+      destinations = await fetchSkiDestinations();
+      localStorage.setItem('destinations', JSON.stringify(destinations));
+    }
+  } catch (error) {
+    console.error('Error getting destinations:', error);
+    // Initialize with mock data from apiService if there's an error
+    destinations = await fetchSkiDestinations();
+  }
+  
+  return destinations || [];
 };
 
 export const getDestinationById = (id: string): Destination | null => {

@@ -37,71 +37,89 @@ const GroupDashboard = () => {
   const [allVotes, setAllVotes] = useState<Vote[]>([]);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   
   // Load all necessary data
   useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) {
-      toast({
-        title: "Not signed in",
-        description: "Please sign in to access this page",
-        variant: "destructive",
-      });
-      navigate("/");
-      return;
-    }
-    setCurrentUser(user);
+    const loadData = async () => {
+      setLoading(true);
+      
+      const user = getCurrentUser();
+      if (!user) {
+        toast({
+          title: "Not signed in",
+          description: "Please sign in to access this page",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
+      setCurrentUser(user);
+      
+      if (!groupId) {
+        toast({
+          title: "Group not found",
+          description: "Invalid group ID",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
+      
+      const fetchedGroup = getGroupById(groupId);
+      if (!fetchedGroup) {
+        toast({
+          title: "Group not found",
+          description: "The group does not exist or you don't have access",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
+      setGroup(fetchedGroup);
+      
+      // Get group members
+      const fetchedMembers = getGroupMembers(groupId);
+      setMembers(fetchedMembers);
+      
+      // Get all destinations
+      try {
+        const fetchedDestinations = await getAllDestinations();
+        setDestinations(fetchedDestinations);
+      } catch (error) {
+        console.error("Error fetching destinations:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load destinations. Using fallback data.",
+          variant: "destructive",
+        });
+      }
+      
+      // Get user's vote
+      const fetchedUserVote = getUserVote(user.id);
+      setUserVote(fetchedUserVote);
+      
+      // Get all votes for this group
+      const fetchedVotes = getVotesByGroupId(groupId);
+      setAllVotes(fetchedVotes);
+      
+      // Get or create the trip for this group
+      let fetchedTrip = getGroupTrip(groupId);
+      if (!fetchedTrip) {
+        fetchedTrip = createTrip(groupId);
+      }
+      setTrip(fetchedTrip);
+      
+      // If the trip has a selected destination, load it
+      if (fetchedTrip.selectedDestinationId) {
+        const fetchedDestination = getDestinationById(fetchedTrip.selectedDestinationId);
+        setSelectedDestination(fetchedDestination);
+      }
+      
+      setLoading(false);
+    };
     
-    if (!groupId) {
-      toast({
-        title: "Group not found",
-        description: "Invalid group ID",
-        variant: "destructive",
-      });
-      navigate("/");
-      return;
-    }
-    
-    const fetchedGroup = getGroupById(groupId);
-    if (!fetchedGroup) {
-      toast({
-        title: "Group not found",
-        description: "The group does not exist or you don't have access",
-        variant: "destructive",
-      });
-      navigate("/");
-      return;
-    }
-    setGroup(fetchedGroup);
-    
-    // Get group members
-    const fetchedMembers = getGroupMembers(groupId);
-    setMembers(fetchedMembers);
-    
-    // Get all destinations
-    const fetchedDestinations = getAllDestinations();
-    setDestinations(fetchedDestinations);
-    
-    // Get user's vote
-    const fetchedUserVote = getUserVote(user.id);
-    setUserVote(fetchedUserVote);
-    
-    // Get all votes for this group
-    const fetchedVotes = getVotesByGroupId(groupId);
-    setAllVotes(fetchedVotes);
-    
-    // Get or create the trip for this group
-    let fetchedTrip = getGroupTrip(groupId);
-    if (!fetchedTrip) {
-      fetchedTrip = createTrip(groupId);
-    }
-    setTrip(fetchedTrip);
-    
-    // If the trip has a selected destination, load it
-    if (fetchedTrip.selectedDestinationId) {
-      const fetchedDestination = getDestinationById(fetchedTrip.selectedDestinationId);
-      setSelectedDestination(fetchedDestination);
-    }
+    loadData();
   }, [groupId, navigate, toast]);
   
   // Handle voting
@@ -236,6 +254,14 @@ const GroupDashboard = () => {
     navigate("/");
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p>Loading destinations...</p>
+      </div>
+    );
+  }
+
   if (!currentUser || !group || !trip) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -333,7 +359,7 @@ const GroupDashboard = () => {
                   userVote={userVote}
                   totalVotes={allVotes.length}
                   votesForDestination={getVotesForDestination(selectedDestination.id)}
-                  isVotingClosed={trip.status !== "voting"}
+                  isVotingClosed={true}
                   isSelected={true}
                 />
               ) : (
@@ -365,9 +391,9 @@ const GroupDashboard = () => {
             />
             
             {/* Voting summary for voting phase */}
-            {trip.status === "voting" && selectedDestination && (
+            {trip.status === "voting" && (
               <TripSummary
-                destination={destinations[0]}
+                destination={destinations.length > 0 ? destinations[0] : undefined}
                 trip={trip}
                 group={group}
                 members={members}
