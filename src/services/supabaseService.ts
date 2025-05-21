@@ -988,19 +988,62 @@ export const updateParticipantStatus = async (
   userId: string,
   status: Participant['status']
 ): Promise<Trip | null> => {
-  const { error: updateError } = await supabase
+  // First check if the participant record exists
+  const { data: existingParticipant, error: checkError } = await supabase
     .from('participants')
-    .update({ status })
+    .select('*')
     .eq('trip_id', tripId)
-    .eq('user_id', userId);
-  
-  if (updateError) {
-    console.error('Error updating participant status:', updateError);
+    .eq('user_id', userId)
+    .maybeSingle();
+    
+  if (checkError) {
+    console.error('Error checking for existing participant:', JSON.stringify(checkError, null, 2));
     return null;
   }
   
-  // Get updated trip
-  return getGroupTrip(await getTripGroupId(tripId));
+  // If no participant record exists, create one with the requested status
+  if (!existingParticipant) {
+    console.log(`No participant record found for user ${userId} in trip ${tripId}. Creating one now.`);
+    const { error: insertError } = await supabase
+      .from('participants')
+      .insert([{
+        trip_id: tripId,
+        user_id: userId,
+        status: status,
+        payment_status: 'not_paid'
+      }]);
+      
+    if (insertError) {
+      console.error('Error creating participant record:', JSON.stringify(insertError, null, 2));
+      return null;
+    }
+    
+    console.log(`Successfully created participant record with status: ${status}`);
+    // After creating, fetch the complete trip data
+    return getTripByTripId(tripId);
+  }
+  
+  // If participant record exists, update it
+  const { data: updatedParticipant, error: updateError } = await supabase
+    .from('participants')
+    .update({ status })
+    .eq('trip_id', tripId)
+    .eq('user_id', userId)
+    .select(); // Request the updated row(s)
+
+  if (updateError) {
+    console.error('Error updating participant status (raw):', JSON.stringify(updateError, null, 2));
+    return null;
+  }
+
+  if (!updatedParticipant || updatedParticipant.length === 0) {
+    console.warn('Participant status update did not return any updated rows. This might indicate an RLS issue or a non-matching condition.');
+  } else {
+    console.log('Participant status updated successfully in DB, returned:', updatedParticipant);
+  }
+
+  // Fetch the entire updated trip object by its ID
+  return getTripByTripId(tripId);
 };
 
 export const updateParticipantPaymentStatus = async (
@@ -1009,25 +1052,64 @@ export const updateParticipantPaymentStatus = async (
   paymentStatus: Participant['paymentStatus'],
   amount?: number
 ): Promise<Trip | null> => {
-  const updateData: any = { payment_status: paymentStatus };
-  
-  if (amount !== undefined) {
-    updateData.payment_amount = amount;
-  }
-  
-  const { error: updateError } = await supabase
+  // First check if the participant record exists
+  const { data: existingParticipant, error: checkError } = await supabase
     .from('participants')
-    .update(updateData)
+    .select('*')
     .eq('trip_id', tripId)
-    .eq('user_id', userId);
-  
-  if (updateError) {
-    console.error('Error updating payment status:', updateError);
+    .eq('user_id', userId)
+    .maybeSingle();
+    
+  if (checkError) {
+    console.error('Error checking for existing participant:', JSON.stringify(checkError, null, 2));
     return null;
   }
   
-  // Get updated trip
-  return getGroupTrip(await getTripGroupId(tripId));
+  // If no participant record exists, create one with the requested payment status
+  if (!existingParticipant) {
+    console.log(`No participant record found for user ${userId} in trip ${tripId}. Creating one now.`);
+    const { error: insertError } = await supabase
+      .from('participants')
+      .insert([{
+        trip_id: tripId,
+        user_id: userId,
+        status: 'pending', // Default status
+        payment_status: paymentStatus
+      }]);
+      
+    if (insertError) {
+      console.error('Error creating participant record:', JSON.stringify(insertError, null, 2));
+      return null;
+    }
+    
+    // After creating, fetch the complete trip data
+    return getTripByTripId(tripId);
+  }
+  
+  // If participant record exists, update it
+  const updateData: any = { payment_status: paymentStatus };
+  if (amount !== undefined) updateData.payment_amount = amount;
+
+  const { data: updatedParticipant, error: updateError } = await supabase
+    .from('participants')
+    .update(updateData)
+    .eq('trip_id', tripId)
+    .eq('user_id', userId)
+    .select(); // Request the updated row(s)
+
+  if (updateError) {
+    console.error('Error updating payment status (raw):', JSON.stringify(updateError, null, 2));
+    return null;
+  }
+
+  if (!updatedParticipant || updatedParticipant.length === 0) {
+    console.warn('Participant payment status update did not return any updated rows. This might indicate an RLS issue or a non-matching condition.');
+  } else {
+    console.log('Participant payment status updated successfully in DB, returned:', updatedParticipant);
+  }
+
+  // Fetch the entire updated trip object by its ID
+  return getTripByTripId(tripId);
 };
 
 // Helper function to get group_id from trip_id
@@ -1039,6 +1121,47 @@ const getTripGroupId = async (tripId: string): Promise<string> => {
     .single();
   
   return data?.group_id || '';
+};
+
+export const getTripByTripId = async (tripId: string): Promise<Trip | null> => {
+  const { data: tripData, error: tripError } = await supabase
+    .from('trips')
+    .select('*')
+    .eq('id', tripId)
+    .single();
+
+  if (tripError || !tripData) {
+    if (tripError) console.error(`Error fetching trip by ID ${tripId}:`, tripError);
+    return null;
+  }
+
+  const { data: participantData, error: participantsError } = await supabase
+    .from('participants')
+    .select('*')
+    .eq('trip_id', tripData.id);
+
+  if (participantsError) {
+    console.error(`Error fetching participants for trip ${tripId}:`, participantsError);
+    // Optionally, decide if this is a critical error or if you can return partial data
+    // For now, we'll continue and return the trip with potentially empty/stale participants if this call fails
+  }
+
+  const formattedParticipants: Participant[] = participantData
+    ? participantData.map(p => ({
+        userId: p.user_id,
+        status: p.status as Participant['status'],
+        paymentStatus: p.payment_status as Participant['paymentStatus'],
+        paymentAmount: p.payment_amount,
+      }))
+    : [];
+
+  return {
+    id: tripData.id,
+    groupId: tripData.group_id,
+    selectedDestinationId: tripData.selected_destination_id || "",
+    participants: formattedParticipants,
+    status: tripData.status as Trip['status'],
+  };
 };
 
 // Destination methods

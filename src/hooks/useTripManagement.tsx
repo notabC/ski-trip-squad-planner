@@ -123,7 +123,7 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         
         if (fetchedTrip) {
           let updatedParticipants = [...(fetchedTrip.participants || [])];
-          const currentMemberIds = members.map(m => m.id); // Use current members state
+          const currentMemberIds = fetchedMembers.map(m => m.id);
 
           if (lastUpdatedUserIdRef.current && lastUpdatedStatusRef.current) {
             const userId = lastUpdatedUserIdRef.current;
@@ -234,22 +234,50 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
   const handleUpdateStatus = async (userId: string, status: Participant["status"]) => {
     if (!trip) { console.error("No trip found"); return; }
     
+    const originalParticipants = trip.participants; // Capture for rollback
+
     isParticipantStatusUpdatingRef.current = true;
     lastUpdatedUserIdRef.current = userId;
     lastUpdatedStatusRef.current = status;
     
-    const originalParticipants = trip.participants; // For rollback
     const optimisticParticipants = trip.participants.map(p => 
       p.userId === userId ? { ...p, status } : p
     );
-    setTrip({ ...trip, participants: optimisticParticipants });
+    setTrip({ ...trip, participants: optimisticParticipants }); // Optimistic update
       
     try {
       const updatedTripFromServer = await updateParticipantStatus(trip.id, userId, status);
       if (!updatedTripFromServer) {
         throw new Error("Failed to update status on server");
       }
-      setTrip(updatedTripFromServer); 
+
+      setTrip(currentClientTrip => {
+        if (!currentClientTrip) {
+          // Fallback, though currentClientTrip should exist due to optimistic update
+          return updatedTripFromServer; 
+        }
+
+        const serverParticipants = updatedTripFromServer.participants || [];
+        const clientParticipants = currentClientTrip.participants || [];
+
+        let finalMergedParticipants = [...serverParticipants];
+        const finalMergedUserIds = new Set(serverParticipants.map(p => p.userId));
+
+        clientParticipants.forEach(clientP => {
+          if (!finalMergedUserIds.has(clientP.userId)) {
+            finalMergedParticipants.push(clientP);
+          }
+        });
+
+        return {
+          ...updatedTripFromServer,
+          participants: finalMergedParticipants
+        };
+      });
+      
+      lastUpdatedUserIdRef.current = null;
+      lastUpdatedStatusRef.current = null;
+
       toast({ title: "Status updated" });
     } catch (error) {
       console.error("Error updating participant status:", error);
@@ -269,6 +297,8 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
 
     isParticipantStatusUpdatingRef.current = true; 
     const originalPaymentStatus = participant.paymentStatus; 
+    const originalParticipantsForPaymentRollback = trip.participants;
+
 
     let newStatus: Participant["paymentStatus"];
     if (participant.paymentStatus === "not_paid") newStatus = "partially_paid"; else newStatus = "paid";
@@ -281,14 +311,34 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
     try {
         const updatedTripFromServer = await updateParticipantPaymentStatus(trip.id, userId, newStatus);
         if (!updatedTripFromServer) throw new Error("Failed to update payment status on server");
-        setTrip(updatedTripFromServer);
+        
+        setTrip(currentClientTrip => {
+          if (!currentClientTrip) {
+            return updatedTripFromServer;
+          }
+
+          const serverParticipants = updatedTripFromServer.participants || [];
+          const clientParticipants = currentClientTrip.participants || [];
+
+          let finalMergedParticipants = [...serverParticipants];
+          const finalMergedUserIds = new Set(serverParticipants.map(p => p.userId));
+
+          clientParticipants.forEach(clientP => {
+            if (!finalMergedUserIds.has(clientP.userId)) {
+              finalMergedParticipants.push(clientP);
+            }
+          });
+          
+          return { ...updatedTripFromServer, participants: finalMergedParticipants };
+        });
         toast({ title: "Payment updated" });
     } catch (error) {
         console.error("Error updating payment status:", error);
-        const rolledBackParticipants = trip.participants.map(p =>
-            p.userId === userId ? { ...p, paymentStatus: originalPaymentStatus } : p
-        );
-        setTrip({ ...trip, participants: rolledBackParticipants });
+        // Rollback to the state before optimistic update for payment
+        setTrip(prevTrip => {
+          if (!prevTrip) return null; // Or handle appropriately
+          return { ...prevTrip, participants: originalParticipantsForPaymentRollback };
+        });
         toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
     } finally {
         isParticipantStatusUpdatingRef.current = false;
