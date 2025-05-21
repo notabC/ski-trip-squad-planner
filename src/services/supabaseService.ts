@@ -1,64 +1,151 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { User, Group, Trip, Vote, Participant, Destination } from "../types";
-import { v4 as uuidv4 } from "uuid";
+import { User, Group, Destination, Trip } from "@/types";
 
-// Authentication methods
+// Auth functions
 export const registerUser = async (name: string, email: string, password: string): Promise<User | null> => {
-  // First, check if the user already exists in our users table
-  const { data: existingUsers } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email);
-  
-  if (existingUsers && existingUsers.length > 0) {
-    // User exists, return the user
-    return existingUsers[0] as unknown as User;
-  }
-  
-  // Create a new user
-  const { data, error } = await supabase
-    .from('users')
-    .insert([
-      { name, email }
-    ])
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error registering user:', error);
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (data.user) {
+      // Create user in users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .insert([
+          { id: data.user.id, name, email }
+        ])
+        .select()
+        .single();
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      return userData;
+    }
+    
     return null;
+  } catch (error) {
+    console.error("Error registering user:", error);
+    throw error;
   }
-  
-  return data as unknown as User;
+};
+
+export const signInUser = async (email: string, password: string): Promise<User | null> => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (data.user) {
+      // Fetch user from users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", data.user.id)
+        .single();
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      return userData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error signing in user:", error);
+    throw error;
+  }
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    throw error;
+  }
+};
+
+export const logoutUser = async (): Promise<void> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Clear local storage
+    localStorage.removeItem("currentUser");
+  } catch (error) {
+    console.error("Error logging out user:", error);
+    throw error;
+  }
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
-  // For now, we'll fetch the user by email from localStorage
-  // In a real authentication system, you'd use supabase.auth
-  const email = localStorage.getItem('ski_planner_current_user_email');
-  
-  if (!email) return null;
-  
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single();
-  
-  if (error || !data) {
+  try {
+    // Check if we have a session
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (sessionData?.session?.user) {
+      // Get user data from our users table
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", sessionData.session.user.id)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data;
+    }
+    
+    // Check for current user in localStorage as fallback
+    const currentUserEmail = localStorage.getItem("currentUser");
+    if (currentUserEmail) {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", currentUserEmail)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error getting current user:", error);
     return null;
   }
-  
-  return data as unknown as User;
-};
-
-export const logoutUser = (): void => {
-  localStorage.removeItem('ski_planner_current_user_email');
 };
 
 export const saveCurrentUser = (email: string): void => {
-  localStorage.setItem('ski_planner_current_user_email', email);
+  localStorage.setItem("currentUser", email);
 };
 
 // Group methods
