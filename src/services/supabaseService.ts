@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { User, Group, Destination, Trip, Participant, Vote } from "@/types";
 
@@ -49,18 +50,50 @@ export const signInUser = async (email: string, password: string): Promise<User 
     }
     
     if (data.user) {
-      // Fetch user from users table
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", data.user.id)
-        .single();
-      
-      if (userError) {
-        throw userError;
+      try {
+        // Fetch user from users table
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", data.user.id)
+          .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no row is found
+        
+        if (userError) {
+          throw userError;
+        }
+        
+        // If user doesn't exist in users table but does in auth, create a new user record
+        if (!userData) {
+          const newUser = {
+            id: data.user.id,
+            name: email.split('@')[0], // Use part of email as name
+            email: email
+          };
+          
+          const { data: newUserData, error: insertError } = await supabase
+            .from("users")
+            .insert([newUser])
+            .select()
+            .single();
+            
+          if (insertError) {
+            throw insertError;
+          }
+          
+          return newUserData;
+        }
+        
+        return userData;
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        
+        // Fallback: Return a basic user object based on auth data
+        return {
+          id: data.user.id,
+          name: email.split('@')[0], // Use part of email as name
+          email: email
+        };
       }
-      
-      return userData;
     }
     
     return null;
@@ -112,10 +145,42 @@ export const getCurrentUser = async (): Promise<User | null> => {
         .from("users")
         .select("*")
         .eq("id", sessionData.session.user.id)
-        .single();
+        .maybeSingle();
       
       if (error) {
         throw error;
+      }
+      
+      // If user doesn't exist in users table but does in auth, create a new user record
+      if (!data) {
+        const authUser = sessionData.session.user;
+        const newUser = {
+          id: authUser.id,
+          name: authUser.email ? authUser.email.split('@')[0] : 'User', // Use part of email as name
+          email: authUser.email || ''
+        };
+        
+        try {
+          const { data: newUserData, error: insertError } = await supabase
+            .from("users")
+            .insert([newUser])
+            .select()
+            .single();
+            
+          if (insertError) {
+            throw insertError;
+          }
+          
+          return newUserData;
+        } catch (insertError) {
+          console.error("Error creating user record:", insertError);
+          // Return basic user object based on auth data as fallback
+          return {
+            id: authUser.id,
+            name: authUser.email ? authUser.email.split('@')[0] : 'User',
+            email: authUser.email || ''
+          };
+        }
       }
       
       return data;
@@ -128,13 +193,15 @@ export const getCurrentUser = async (): Promise<User | null> => {
         .from("users")
         .select("*")
         .eq("email", currentUserEmail)
-        .single();
+        .maybeSingle();
       
       if (error) {
         throw error;
       }
       
-      return data;
+      if (data) {
+        return data;
+      }
     }
     
     return null;
