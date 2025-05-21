@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { User, Group, Destination, Trip, Participant, Vote } from "@/types";
+import { fetchSkiDestinations } from "./apiService";
+import type { User, Group, Trip, Participant, Destination, SkiResort, HotelAccommodation, Vote } from "@/types";
 
 // Auth functions
 export const registerUser = async (name: string, email: string, password: string): Promise<User | null> => {
@@ -1166,57 +1167,107 @@ export const getTripByTripId = async (tripId: string): Promise<Trip | null> => {
 
 // Destination methods
 export const getAllDestinations = async (): Promise<Destination[]> => {
-  const { data, error } = await supabase
-    .from('destinations')
-    .select('*');
-  
-  if (error) {
-    console.error('Error fetching destinations:', error);
-    return [];
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching destinations:', error);
+      return [];
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('No destinations found in database, fetching from API');
+      return await fetchSkiDestinations();
+    }
+    
+    // Transform the database format to the new model
+    return data.map(d => {
+      // Create a SkiResort object
+      const resort: SkiResort = {
+        id: `resort-${d.id}`,
+        name: d.name,
+        location: d.location,
+        description: d.description || '',
+        image: d.image || '',
+        difficulty: d.difficulty as 'beginner' | 'intermediate' | 'advanced'
+      };
+      
+      // Create a HotelAccommodation object (using basic info from the DB)
+      const accommodation: HotelAccommodation = {
+        id: `acc-${d.id}`,
+        name: `${d.name} Lodging`,
+        description: `Accommodation at ${d.name}`,
+        image: d.image || '',
+        price: d.price * 0.7, // 70% of the total price is accommodation
+        amenities: d.amenities || []
+      };
+      
+      // Create the full destination package
+      return {
+        id: d.id,
+        resort,
+        accommodation,
+        price: d.price,
+        dates: {
+          start: d.start_date,
+          end: d.end_date
+        }
+      };
+    });
+  } catch (error) {
+    console.error('Error in getAllDestinations:', error);
+    return await fetchSkiDestinations();
   }
-  
-  return data.map(d => ({
-    id: d.id,
-    name: d.name,
-    location: d.location,
-    description: d.description || '',
-    image: d.image || '',
-    price: d.price,
-    dates: {
-      start: d.start_date,
-      end: d.end_date
-    },
-    amenities: d.amenities || [],
-    difficulty: d.difficulty as 'beginner' | 'intermediate' | 'advanced'
-  }));
 };
 
 export const getDestinationById = async (id: string): Promise<Destination | null> => {
-  const { data, error } = await supabase
-    .from('destinations')
-    .select('*')
-    .eq('id', id)
-    .single();
-  
-  if (error || !data) {
-    console.error('Error fetching destination:', error);
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error fetching destination:', error);
+      return null;
+    }
+    
+    // Transform to the new model
+    const resort: SkiResort = {
+      id: `resort-${data.id}`,
+      name: data.name,
+      location: data.location,
+      description: data.description || '',
+      image: data.image || '',
+      difficulty: data.difficulty as 'beginner' | 'intermediate' | 'advanced'
+    };
+    
+    const accommodation: HotelAccommodation = {
+      id: `acc-${data.id}`,
+      name: `${data.name} Lodging`,
+      description: `Accommodation at ${data.name}`,
+      image: data.image || '',
+      price: data.price * 0.7, // 70% of the total price is accommodation
+      amenities: data.amenities || []
+    };
+    
+    return {
+      id: data.id,
+      resort,
+      accommodation,
+      price: data.price,
+      dates: {
+        start: data.start_date,
+        end: data.end_date
+      }
+    };
+  } catch (error) {
+    console.error('Error in getDestinationById:', error);
     return null;
   }
-  
-  return {
-    id: data.id,
-    name: data.name,
-    location: data.location,
-    description: data.description || '',
-    image: data.image || '',
-    price: data.price,
-    dates: {
-      start: data.start_date,
-      end: data.end_date
-    },
-    amenities: data.amenities || [],
-    difficulty: data.difficulty as 'beginner' | 'intermediate' | 'advanced'
-  };
 };
 
 // Voting methods

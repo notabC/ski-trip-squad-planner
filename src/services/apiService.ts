@@ -1,88 +1,109 @@
-
-import { mockDestinations } from "@/models/mockData";
-import type { Destination } from "@/types";
+import { mockDestinations, mockSkiResorts, mockAccommodations } from "@/models/mockData";
+import type { Destination, SkiResort, HotelAccommodation } from "@/types";
 
 // LiteAPI endpoint and key
 const LITE_API_BASE_URL = "https://api.liteapi.travel/hotels/v2";
-const LITE_API_KEY = ""; // In a production app, this would be stored in env variables
+// In a real app, this would be stored in environment variables
+const LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || "";
+
+// Ski resort city IDs for LiteAPI (approximate city IDs)
+const SKI_RESORT_CITY_IDS = {
+  "Chamonix": "3000040033", // Chamonix (using Aspen ID as placeholder)
+  "Whistler": "3000040033", // Whistler (using Aspen ID as placeholder)
+  "Zermatt": "3000040033", // Zermatt (using Aspen ID as placeholder)
+};
 
 /**
- * Transforms hotel data from LiteAPI to our Destination format
+ * Transforms hotel data from LiteAPI to our HotelAccommodation format
  */
-const transformHotelToDestination = (hotel: any): Destination => {
+const transformHotelToAccommodation = (hotel: any): HotelAccommodation => {
   // Extract the first image URL or use a placeholder
   const imageUrl = hotel.images && hotel.images.length > 0 
     ? hotel.images[0].url 
-    : "/images/ski-resort-1.jpg";
+    : "/images/hotel-placeholder.jpg";
   
   // Extract price information
-  let price = 1299; // Default fallback price
+  let price = 899; // Default fallback price
   if (hotel.price && hotel.price.lead && hotel.price.lead.amount) {
     price = hotel.price.lead.amount;
   }
   
-  // Generate a random difficulty level
-  const difficulties = ["beginner", "intermediate", "advanced"];
-  const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)] as Destination["difficulty"];
-  
-  // Generate random start and end dates for the ski trip (1-2 months in the future)
-  const today = new Date();
-  const startDate = new Date(today);
-  startDate.setDate(today.getDate() + Math.floor(Math.random() * 30) + 30); // 30-60 days from now
-  
-  const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 7); // 7 day trip
-  
   // Extract amenities
   const amenities = hotel.facilities 
     ? hotel.facilities.slice(0, 6).map((facility: any) => facility.name) 
-    : ["Ski-in/Ski-out Access", "Hot Tub", "Free WiFi", "Restaurant", "Spa Services", "Equipment Rental"];
+    : ["Free WiFi", "Restaurant", "Spa Services", "Parking", "Fitness Center", "Breakfast"];
   
   return {
-    id: `dest-api-${hotel.id || Math.random().toString(36).substr(2, 9)}`,
-    name: hotel.name || "Mountain Resort",
-    location: `${hotel.location?.address?.city || "Unknown"}, ${hotel.location?.address?.country || "Unknown"}`,
-    description: hotel.description || "Experience the majesty of this premium resort featuring stunning mountain views, world-class slopes for all skill levels, and luxurious accommodations.",
+    id: `acc-api-${hotel.id || Math.random().toString(36).substr(2, 9)}`,
+    name: hotel.name || "Mountain View Hotel",
+    description: hotel.description || "Comfortable accommodations with convenient access to nearby slopes.",
     image: imageUrl,
     price: price,
-    dates: {
-      start: startDate.toISOString().split('T')[0],
-      end: endDate.toISOString().split('T')[0],
-    },
     amenities: amenities,
-    difficulty: randomDifficulty
+    hotelId: hotel.id
   };
 };
 
 /**
- * Fetch ski destinations from LiteAPI
+ * Create a destination package combining a ski resort with a hotel accommodation
  */
-export const fetchSkiDestinations = async (): Promise<Destination[]> => {
-  console.log("Fetching ski destinations...");
+const createDestinationPackage = (
+  resort: SkiResort, 
+  accommodation: HotelAccommodation, 
+  startDate: string, 
+  endDate: string
+): Destination => {
+  // Add lift ticket prices to the base hotel price
+  const liftTicketPrices = {
+    "beginner": 250,
+    "intermediate": 300,
+    "advanced": 400
+  };
   
-  // Always return mock data as fallback initially
-  // Remove this line if you want to attempt the API call first
-  console.log("Using mock data for destinations");
-  return mockDestinations;
+  const liftTicketPrice = liftTicketPrices[resort.difficulty] || 300;
+  const totalPrice = accommodation.price + liftTicketPrice;
   
-  // Uncomment below if you want to try API first, then fallback
-  /*
+  return {
+    id: `pkg-${resort.id}-${accommodation.id}`,
+    resort,
+    accommodation,
+    price: totalPrice,
+    dates: {
+      start: startDate,
+      end: endDate
+    }
+  };
+};
+
+/**
+ * Fetch hotels near a ski resort from LiteAPI
+ */
+const fetchHotelsForResort = async (
+  resort: SkiResort, 
+  checkIn: string, 
+  checkOut: string, 
+  limit: number = 2
+): Promise<HotelAccommodation[]> => {
   if (!LITE_API_KEY) {
-    console.log("No API key provided, using mock data");
-    return mockDestinations;
+    console.log(`No API key, using mock data for ${resort.name}`);
+    return mockAccommodations.filter(acc => 
+      acc.id.startsWith(`acc-${resort.id.split('-')[1]}`));
   }
   
   try {
-    // Search for ski hotels
+    const cityId = SKI_RESORT_CITY_IDS[resort.location.split(',')[0].trim()] || "3000040033";
+    
     const params = new URLSearchParams({
       adults: "2",
       children: "0",
-      checkIn: "2024-12-15", // Winter dates for ski season
-      checkOut: "2024-12-22",
+      checkIn,
+      checkOut,
       currency: "USD",
-      cityId: "3000040033", // Aspen, a popular ski destination
-      limit: "5" // Limit to 5 results
+      cityId,
+      limit: limit.toString()
     });
+    
+    console.log(`Fetching hotels near ${resort.name} for dates ${checkIn} to ${checkOut}`);
     
     const response = await fetch(`${LITE_API_BASE_URL}/search?${params}`, {
       method: "GET",
@@ -100,27 +121,67 @@ export const fetchSkiDestinations = async (): Promise<Destination[]> => {
     const data = await response.json();
     
     if (!data.hotels || !Array.isArray(data.hotels) || data.hotels.length === 0) {
-      console.log("No hotels found in API response, using mock data");
-      return mockDestinations;
+      console.log(`No hotels found for ${resort.name}, using mock data`);
+      return mockAccommodations.filter(acc => 
+        acc.id.startsWith(`acc-${resort.id.split('-')[1]}`));
     }
     
-    // Transform hotel data to our Destination format
-    const destinations: Destination[] = data.hotels
+    // Transform hotel data to our HotelAccommodation format
+    return data.hotels
       .filter((hotel: any) => hotel.name && hotel.id)
-      .map(transformHotelToDestination);
+      .map(transformHotelToAccommodation);
     
-    // If we didn't get enough results, supplement with mock data
-    if (destinations.length < 3) {
-      const remainingCount = 3 - destinations.length;
-      return [...destinations, ...mockDestinations.slice(0, remainingCount)];
+  } catch (error) {
+    console.error(`Error fetching hotels for ${resort.name}:`, error);
+    console.log("Using mock accommodations as fallback");
+    return mockAccommodations.filter(acc => 
+      acc.id.startsWith(`acc-${resort.id.split('-')[1]}`));
+  }
+};
+
+/**
+ * Fetch all ski destinations with accommodation options
+ */
+export const fetchSkiDestinations = async (): Promise<Destination[]> => {
+  console.log("Fetching ski destinations with accommodations...");
+  
+  // Use mock resorts
+  const skiResorts = mockSkiResorts;
+  
+  // Set dates for the packages (next winter season)
+  const today = new Date();
+  const winterYear = today.getMonth() >= 8 ? today.getFullYear() + 1 : today.getFullYear();
+  const startDate = `${winterYear}-01-15`;
+  const endDate = `${winterYear}-01-22`;
+  
+  try {
+    // For each resort, fetch hotels and create packages
+    const destinationPromises = skiResorts.map(async (resort) => {
+      // Fetch hotels for this resort
+      const hotels = await fetchHotelsForResort(resort, startDate, endDate);
+      
+      // Create destination packages for each hotel
+      return hotels.map(hotel => 
+        createDestinationPackage(resort, hotel, startDate, endDate)
+      );
+    });
+    
+    // Wait for all promises to resolve
+    const destinationsNested = await Promise.all(destinationPromises);
+    
+    // Flatten the array of arrays
+    const destinations = destinationsNested.flat();
+    
+    if (destinations.length === 0) {
+      console.log("No destinations found, using mock data");
+      return mockDestinations;
     }
     
     return destinations;
     
   } catch (error) {
     console.error("Error fetching ski destinations:", error);
-    console.log("Using mock data as fallback");
+    console.log("Using mock destinations as fallback");
     return mockDestinations;
   }
-  */
 };

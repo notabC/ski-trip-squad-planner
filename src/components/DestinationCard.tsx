@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Destination, Vote } from "@/types";
-import { CalendarIcon, MapPinIcon, DollarSignIcon, ThumbsUpIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, MapPinIcon, DollarSignIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, HomeIcon } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 
 interface DestinationCardProps {
@@ -28,7 +28,7 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
   const isVoted = userVote?.destinationId === destination.id;
   const votePercentage = totalVotes > 0 ? Math.round((votesForDestination / totalVotes) * 100) : 0;
   
-  const getDifficultyColor = (difficulty: Destination["difficulty"]) => {
+  const getDifficultyColor = (difficulty: Destination["resort"]["difficulty"]) => {
     switch (difficulty) {
       case "beginner":
         return "bg-green-500";
@@ -45,8 +45,8 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
     <Card className={`overflow-hidden transition-all duration-300 hover:shadow-lg ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}>
       <div className="relative h-48 overflow-hidden">
         <img
-          src={destination.image}
-          alt={destination.name}
+          src={destination.resort.image}
+          alt={destination.resort.name}
           className="w-full h-full object-cover"
         />
         {isSelected && (
@@ -55,9 +55,9 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
           </div>
         )}
         <Badge 
-          className={`absolute bottom-2 right-2 ${getDifficultyColor(destination.difficulty)}`}
+          className={`absolute bottom-2 right-2 ${getDifficultyColor(destination.resort.difficulty)}`}
         >
-          {destination.difficulty.charAt(0).toUpperCase() + destination.difficulty.slice(1)}
+          {destination.resort.difficulty.charAt(0).toUpperCase() + destination.resort.difficulty.slice(1)}
         </Badge>
         
         {/* Vote count badge */}
@@ -66,53 +66,68 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
           <span>{votesForDestination} {votesForDestination === 1 ? "vote" : "votes"}</span>
         </div>
       </div>
-      
-      <CardHeader>
-        <CardTitle>{destination.name}</CardTitle>
-        <CardDescription className="flex items-center gap-1">
-          <MapPinIcon size={14} />
-          {destination.location}
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground line-clamp-2">{destination.description}</p>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <CalendarIcon size={14} className="text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              {new Date(destination.dates.start).toLocaleDateString()} - 
-              {new Date(destination.dates.end).toLocaleDateString()}
+      <CardHeader className="p-3">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold line-clamp-1">
+              {destination.resort.name}
+            </CardTitle>
+            <span className="text-sm font-semibold text-primary">
+              {formatCurrency(destination.price)}
             </span>
           </div>
-          <div className="font-semibold flex items-center">
-            <DollarSignIcon size={14} className="mr-1" />
-            {formatCurrency(destination.price)}
+          <div className="flex items-center text-sm text-muted-foreground">
+            <MapPinIcon size={14} className="mr-1" />
+            <span className="line-clamp-1">{destination.resort.location}</span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-3 pt-0 space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
+            <SnowflakeIcon size={16} className="mb-1 text-blue-500" />
+            <span className="text-xs font-medium">Resort</span>
+            <span className="text-xs line-clamp-1">{destination.resort.name}</span>
+          </div>
+          <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
+            <HomeIcon size={16} className="mb-1 text-orange-500" />
+            <span className="text-xs font-medium">Accommodation</span>
+            <span className="text-xs line-clamp-1">{destination.accommodation.name}</span>
           </div>
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          {destination.amenities.slice(0, 3).map((amenity, index) => (
-            <Badge key={index} variant="outline" className="bg-secondary/30">
-              {amenity}
-            </Badge>
-          ))}
-          {destination.amenities.length > 3 && (
-            <Badge variant="outline" className="bg-secondary/30">
-              +{destination.amenities.length - 3} more
-            </Badge>
-          )}
+        <div className="space-y-3">
+          <div className="text-xs">
+            <div className="font-medium mb-1">Accommodation Details:</div>
+            <p className="line-clamp-2 text-muted-foreground">{destination.accommodation.description}</p>
+          </div>
+          
+          {/* Amenities display */}
+          <div className="space-y-1">
+            <div className="text-xs font-medium">Amenities:</div>
+            <div className="flex flex-wrap gap-1">
+              {destination.accommodation.amenities.slice(0, 3).map((amenity, index) => (
+                <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
+                  {amenity}
+                </Badge>
+              ))}
+              {destination.accommodation.amenities.length > 3 && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                  +{destination.accommodation.amenities.length - 3} more
+                </Badge>
+              )}
+            </div>
+          </div>
         </div>
         
-        {!isVotingClosed && (
-          <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="absolute top-0 left-0 h-full bg-primary"
-              style={{ width: `${votePercentage}%` }}
-            />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+          <div className="flex items-center">
+            <CalendarIcon size={14} className="mr-1" />
+            <span>
+              {new Date(destination.dates.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(destination.dates.end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
           </div>
-        )}
+        </div>
         
         {totalVotes > 0 && (
           <div className="text-sm text-center font-medium flex items-center justify-center gap-1">

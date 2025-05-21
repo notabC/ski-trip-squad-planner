@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string;
@@ -13,19 +12,34 @@ export interface Group {
   joinCode: string;
 }
 
-export interface Destination {
+export interface SkiResort {
   id: string;
   name: string;
   location: string;
   description: string;
   image: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+}
+
+export interface HotelAccommodation {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
   price: number;
+  amenities: string[];
+  hotelId?: string; // Original ID from liteAPI
+}
+
+export interface Destination {
+  id: string;
+  resort: SkiResort;
+  accommodation: HotelAccommodation;
+  price: number; // Total package price
   dates: {
     start: string;
     end: string;
   };
-  amenities: string[];
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
 }
 
 export interface Vote {

@@ -1,3 +1,61 @@
+# Ski Trip Squad Planner
+
+A collaborative web application for planning ski trips with friends. This app allows groups to vote on ski destinations, each paired with nearby accommodations, and coordinate travel plans.
+
+## Features
+
+- User authentication and group creation
+- Ski resort + accommodation package voting
+- Trip status tracking (voting, confirmed, completed)
+- Participant status management (pending, confirmed, declined)
+- Payment tracking
+
+## Technical Details
+
+This application is built with:
+- React + TypeScript
+- Vite
+- Tailwind CSS
+- Shadcn/UI components
+- Supabase for backend data storage
+
+## LiteAPI Integration
+
+The app uses [LiteAPI](https://liteapi.travel/) to fetch real hotel data near ski resorts:
+
+1. Sign up for a free LiteAPI account at https://dashboard.liteapi.travel/register
+2. Get your API key from the dashboard
+3. Create a `.env` file in the project root with the following content:
+   ```
+   VITE_LITE_API_KEY=your_liteapi_key_here
+   ```
+
+Without a valid API key, the application will fall back to using mock data.
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Set up environment variables as described above
+4. Start the development server:
+   ```
+   npm run dev
+   ```
+
+## Data Flow
+
+- The application fetches ski resorts (3 mock resorts by default)
+- For each resort, the app uses liteAPI to fetch nearby hotel accommodations
+- These are combined into "destination packages" that users can vote on
+- Each package includes resort details, accommodation info, and pricing
+
+## Customization
+
+You can modify the ski resorts in `src/models/mockData.ts` and adjust the LiteAPI search parameters in `src/services/apiService.ts` to target different destinations.
+
 # Welcome to your Lovable project
 
 ## Project info
