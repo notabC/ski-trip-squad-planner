@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -112,8 +111,12 @@ const GroupDashboard = () => {
       
       // If the trip has a selected destination, load it
       if (fetchedTrip.selectedDestinationId) {
-        const fetchedDestination = getDestinationById(fetchedTrip.selectedDestinationId);
-        setSelectedDestination(fetchedDestination);
+        try {
+          const fetchedDestination = await getDestinationById(fetchedTrip.selectedDestinationId);
+          setSelectedDestination(fetchedDestination);
+        } catch (error) {
+          console.error("Error fetching selected destination:", error);
+        }
       }
       
       setLoading(false);
@@ -144,7 +147,7 @@ const GroupDashboard = () => {
   };
   
   // Handle finalizing the voting
-  const handleFinalizeVoting = () => {
+  const handleFinalizeVoting = async () => {
     if (!groupId) return;
     
     const updatedTrip = finalizeVoting(groupId);
@@ -160,13 +163,24 @@ const GroupDashboard = () => {
     setTrip(updatedTrip);
     
     // Load the selected destination
-    const selectedDest = getDestinationById(updatedTrip.selectedDestinationId);
-    setSelectedDestination(selectedDest);
-    
-    toast({
-      title: "Voting finalized",
-      description: "The trip destination has been selected",
-    });
+    if (updatedTrip.selectedDestinationId) {
+      try {
+        const selectedDest = await getDestinationById(updatedTrip.selectedDestinationId);
+        setSelectedDestination(selectedDest);
+        
+        toast({
+          title: "Voting finalized",
+          description: "The trip destination has been selected",
+        });
+      } catch (error) {
+        console.error("Error fetching selected destination:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load selected destination details",
+          variant: "destructive",
+        });
+      }
+    }
   };
   
   // Handle updating participant status
