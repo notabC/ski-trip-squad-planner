@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { registerUser } from "@/services/localStorageService";
+import { registerUser, saveCurrentUser } from "@/services/supabaseService";
 import { toast } from "@/components/ui/use-toast";
 
 const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }) => {
@@ -37,7 +37,15 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
         return;
       }
       
-      registerUser(name, email);
+      const user = await registerUser(name, email);
+      
+      if (!user) {
+        throw new Error("Failed to register user");
+      }
+      
+      // Save the current user's email to localStorage for session persistence
+      saveCurrentUser(email);
+      
       toast({
         title: "Welcome!",
         description: "You've successfully signed in",

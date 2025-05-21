@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createGroup, joinGroup } from "@/services/localStorageService";
+import { createGroup, joinGroup } from "@/services/supabaseService";
 import { User } from "@/types";
 import { toast } from "@/components/ui/use-toast";
 
@@ -19,7 +19,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
   const [joinCode, setJoinCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreateGroup = (e: React.FormEvent) => {
+  const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!groupName) {
@@ -34,7 +34,12 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
     setIsSubmitting(true);
     
     try {
-      const newGroup = createGroup(groupName, currentUser.id);
+      const newGroup = await createGroup(groupName, currentUser.id);
+      
+      if (!newGroup) {
+        throw new Error("Failed to create group");
+      }
+      
       toast({
         title: "Group created!",
         description: `Your join code is: ${newGroup.joinCode}`,
@@ -52,7 +57,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
     }
   };
 
-  const handleJoinGroup = (e: React.FormEvent) => {
+  const handleJoinGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!joinCode) {
@@ -67,7 +72,7 @@ const GroupForm: React.FC<GroupFormProps> = ({ currentUser, onGroupCreated }) =>
     setIsSubmitting(true);
     
     try {
-      const group = joinGroup(joinCode, currentUser.id);
+      const group = await joinGroup(joinCode, currentUser.id);
       
       if (!group) {
         toast({

@@ -1,8 +1,12 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { initializeStorage, getCurrentUser, logoutUser, getUserGroups } from "@/services/localStorageService";
+import { 
+  getCurrentUser, 
+  logoutUser, 
+  getUserGroups, 
+  saveCurrentUser 
+} from "@/services/supabaseService";
 import AuthForm from "@/components/AuthForm";
 import GroupForm from "@/components/GroupForm";
 import { User, Group } from "@/types";
@@ -13,26 +17,39 @@ const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Initialize local storage with mock data
-    initializeStorage();
+    const loadUserData = async () => {
+      try {
+        // Check if user is already logged in
+        const currentUser = await getCurrentUser();
+        
+        if (currentUser) {
+          setUser(currentUser);
+          const groups = await getUserGroups(currentUser.id);
+          setUserGroups(groups);
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    // Check if user is already logged in
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      const groups = getUserGroups(currentUser.id);
-      setUserGroups(groups);
-    }
+    loadUserData();
   }, []);
   
-  const handleAuthenticated = () => {
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      const groups = getUserGroups(currentUser.id);
-      setUserGroups(groups);
+  const handleAuthenticated = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        const groups = await getUserGroups(currentUser.id);
+        setUserGroups(groups);
+      }
+    } catch (error) {
+      console.error("Error after authentication:", error);
     }
   };
   
@@ -50,6 +67,14 @@ const Index = () => {
   const handleGroupSelected = (groupId: string) => {
     navigate(`/group/${groupId}`);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background snow-bg">

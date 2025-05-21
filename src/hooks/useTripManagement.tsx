@@ -14,7 +14,7 @@ import {
   updateParticipantStatus,
   updateParticipantPaymentStatus,
   getDestinationById
-} from "@/services/localStorageService";
+} from "@/services/supabaseService";
 import type { Group, User, Destination, Trip, Participant, Vote } from "@/types";
 
 export const useTripManagement = (groupId: string | undefined, currentUser: User | null) => {
@@ -39,101 +39,109 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         return;
       }
       
-      const fetchedGroup = getGroupById(groupId);
-      if (!fetchedGroup) {
-        setLoading(false);
-        return;
-      }
-      setGroup(fetchedGroup);
-      
-      // Get group members
-      const fetchedMembers = getGroupMembers(groupId);
-      setMembers(fetchedMembers);
-      
-      // Get all destinations
       try {
+        const fetchedGroup = await getGroupById(groupId);
+        if (!fetchedGroup) {
+          setLoading(false);
+          return;
+        }
+        setGroup(fetchedGroup);
+        
+        // Get group members
+        const fetchedMembers = await getGroupMembers(groupId);
+        setMembers(fetchedMembers);
+        
+        // Get all destinations
         const fetchedDestinations = await getAllDestinations();
         setDestinations(fetchedDestinations);
+        
+        // Get user's vote
+        const fetchedUserVote = await getUserVote(currentUser.id);
+        setUserVote(fetchedUserVote);
+        
+        // Get all votes for this group
+        const fetchedVotes = await getVotesByGroupId(groupId);
+        setAllVotes(fetchedVotes);
+        
+        // Get or create the trip for this group
+        let fetchedTrip = await getGroupTrip(groupId);
+        if (!fetchedTrip) {
+          fetchedTrip = await createTrip(groupId);
+        }
+        
+        if (fetchedTrip) {
+          setTrip(fetchedTrip);
+          
+          // If the trip has a selected destination, load it
+          if (fetchedTrip.selectedDestinationId) {
+            const fetchedDestination = await getDestinationById(fetchedTrip.selectedDestinationId);
+            setSelectedDestination(fetchedDestination);
+          }
+        }
       } catch (error) {
-        console.error("Error fetching destinations:", error);
+        console.error("Error loading trip data:", error);
         toast({
           title: "Error",
-          description: "Failed to load destinations. Using fallback data.",
+          description: "Failed to load trip information.",
           variant: "destructive",
         });
+      } finally {
+        setLoading(false);
       }
-      
-      // Get user's vote
-      const fetchedUserVote = getUserVote(currentUser.id);
-      setUserVote(fetchedUserVote);
-      
-      // Get all votes for this group
-      const fetchedVotes = getVotesByGroupId(groupId);
-      setAllVotes(fetchedVotes);
-      
-      // Get or create the trip for this group
-      let fetchedTrip = getGroupTrip(groupId);
-      if (!fetchedTrip) {
-        fetchedTrip = createTrip(groupId);
-      }
-      setTrip(fetchedTrip);
-      
-      // If the trip has a selected destination, load it
-      if (fetchedTrip.selectedDestinationId) {
-        try {
-          const fetchedDestination = await getDestinationById(fetchedTrip.selectedDestinationId);
-          setSelectedDestination(fetchedDestination);
-        } catch (error) {
-          console.error("Error fetching selected destination:", error);
-        }
-      }
-      
-      setLoading(false);
     };
     
     loadData();
   }, [groupId, currentUser, toast]);
   
   // Handle voting
-  const handleVote = (destinationId: string) => {
+  const handleVote = async (destinationId: string) => {
     if (!currentUser) return;
     
-    castVote(currentUser.id, destinationId);
-    setUserVote({
-      userId: currentUser.id,
-      destinationId,
-      timestamp: Date.now(),
-    });
-    
-    // Update all votes
-    const updatedVotes = getVotesByGroupId(groupId || "");
-    setAllVotes(updatedVotes);
-    
-    toast({
-      title: "Vote cast",
-      description: "Your vote has been recorded",
-    });
+    try {
+      await castVote(currentUser.id, destinationId);
+      setUserVote({
+        userId: currentUser.id,
+        destinationId,
+        timestamp: Date.now(),
+      });
+      
+      // Update all votes
+      const updatedVotes = await getVotesByGroupId(groupId || "");
+      setAllVotes(updatedVotes);
+      
+      toast({
+        title: "Vote cast",
+        description: "Your vote has been recorded",
+      });
+    } catch (error) {
+      console.error("Error casting vote:", error);
+      toast({
+        title: "Error",
+        description: "Failed to cast vote. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   // Handle finalizing the voting
   const handleFinalizeVoting = async () => {
     if (!groupId) return;
     
-    const updatedTrip = finalizeVoting(groupId);
-    if (!updatedTrip) {
-      toast({
-        title: "Error",
-        description: "Failed to finalize voting. Make sure there are votes.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setTrip(updatedTrip);
-    
-    // Load the selected destination
-    if (updatedTrip.selectedDestinationId) {
-      try {
+    try {
+      const updatedTrip = await finalizeVoting(groupId);
+      if (!updatedTrip) {
+        toast({
+          title: "Error",
+          description: "Failed to finalize voting. Make sure there are votes.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setTrip(updatedTrip);
+      
+      // Load the selected destination
+      if (updatedTrip.selectedDestinationId) {
         const selectedDest = await getDestinationById(updatedTrip.selectedDestinationId);
         setSelectedDestination(selectedDest);
         
@@ -141,41 +149,50 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
           title: "Voting finalized",
           description: "The trip destination has been selected",
         });
-      } catch (error) {
-        console.error("Error fetching selected destination:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load selected destination details",
-          variant: "destructive",
-        });
       }
+    } catch (error) {
+      console.error("Error finalizing voting:", error);
+      toast({
+        title: "Error",
+        description: "Failed to finalize voting.",
+        variant: "destructive",
+      });
     }
   };
   
   // Handle updating participant status
-  const handleUpdateStatus = (userId: string, status: "confirmed" | "declined") => {
+  const handleUpdateStatus = async (userId: string, status: "confirmed" | "declined") => {
     if (!trip) return;
     
-    const updatedTrip = updateParticipantStatus(trip.id, userId, status);
-    if (!updatedTrip) {
+    try {
+      const updatedTrip = await updateParticipantStatus(trip.id, userId, status);
+      if (!updatedTrip) {
+        toast({
+          title: "Error",
+          description: "Failed to update status",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setTrip(updatedTrip);
+      
+      toast({
+        title: "Status updated",
+        description: `You've ${status === "confirmed" ? "joined" : "declined"} the trip`,
+      });
+    } catch (error) {
+      console.error("Error updating participant status:", error);
       toast({
         title: "Error",
-        description: "Failed to update status",
+        description: "Failed to update status.",
         variant: "destructive",
       });
-      return;
     }
-    
-    setTrip(updatedTrip);
-    
-    toast({
-      title: "Status updated",
-      description: `You've ${status === "confirmed" ? "joined" : "declined"} the trip`,
-    });
   };
   
   // Handle updating payment status
-  const handleUpdatePayment = (userId: string) => {
+  const handleUpdatePayment = async (userId: string) => {
     if (!trip) return;
     
     const participant = trip.participants.find(p => p.userId === userId);
@@ -192,27 +209,36 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
       toastMessage = "Payment completed. Thank you!";
     }
     
-    const updatedTrip = updateParticipantPaymentStatus(
-      trip.id,
-      userId,
-      newStatus
-    );
-    
-    if (!updatedTrip) {
+    try {
+      const updatedTrip = await updateParticipantPaymentStatus(
+        trip.id,
+        userId,
+        newStatus
+      );
+      
+      if (!updatedTrip) {
+        toast({
+          title: "Error",
+          description: "Failed to update payment status",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setTrip(updatedTrip);
+      
+      toast({
+        title: "Payment updated",
+        description: toastMessage,
+      });
+    } catch (error) {
+      console.error("Error updating payment status:", error);
       toast({
         title: "Error",
-        description: "Failed to update payment status",
+        description: "Failed to update payment status.",
         variant: "destructive",
       });
-      return;
     }
-    
-    setTrip(updatedTrip);
-    
-    toast({
-      title: "Payment updated",
-      description: toastMessage,
-    });
   };
 
   // Format participants data
