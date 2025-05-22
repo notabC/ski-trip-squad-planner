@@ -24,6 +24,11 @@ A collaborative web application for planning ski trips with friends. This applic
 - Participant status tracking
 - Payment tracking
 - Mobile-responsive design
+- LiteAPI Integration:
+  - Fetches real hotel data for ski destinations
+  - Transforms API data to application format
+  - Robust error handling with fallback to mock data
+  - Dynamic pricing based on resort difficulty
 
 ## Setup Instructions
 
