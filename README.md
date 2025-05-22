@@ -1,131 +1,192 @@
 # Ski Trip Squad Planner
 
-A collaborative web application for planning ski trips with friends. This app allows groups to vote on ski destinations, each paired with nearby accommodations, and coordinate travel plans.
+A collaborative web application for planning ski trips with friends. This application allows groups to vote on destinations, track participant status, and manage payments all in one place.
+
+## Tech Stack
+
+- **Frontend Framework**: React with TypeScript
+- **Build Tool**: Vite
+- **UI Components**: Shadcn UI (built on Radix UI)
+- **Styling**: Tailwind CSS
+- **Backend/Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **State Management**: React Query + React Context
+- **Form Handling**: React Hook Form with Zod validation
+- **Routing**: React Router
+- **Charts/Data Visualization**: Recharts
 
 ## Features
 
-- User authentication and group creation
-- Ski resort + accommodation package voting
-- Trip status tracking (voting, confirmed, completed)
-- Participant status management (pending, confirmed, declined)
+- Authentication (email/password, magic link)
+- Group creation with unique join codes
+- Destination voting system
+- Trip status management (voting → confirmed → completed)
+- Participant status tracking
 - Payment tracking
+- Mobile-responsive design
 
-## Technical Details
+## Setup Instructions
 
-This application is built with:
-- React + TypeScript
-- Vite
-- Tailwind CSS
-- Shadcn/UI components
-- Supabase for backend data storage
+### Prerequisites
 
-## LiteAPI Integration
+- Node.js 18+ or Bun
+- NPM/Yarn/Bun package manager
+- Git
 
-The app uses [LiteAPI](https://liteapi.travel/) to fetch real hotel data near ski resorts:
+### Installation
 
-1. Sign up for a free LiteAPI account at https://dashboard.liteapi.travel/register
-2. Get your API key from the dashboard
-3. Create a `.env` file in the project root with the following content:
+1. Clone the repository:
    ```
-   VITE_LITE_API_KEY=your_liteapi_key_here
+   git clone https://github.com/your-username/ski-trip-squad-planner.git
+   cd ski-trip-squad-planner
    ```
 
-Without a valid API key, the application will fall back to using mock data.
-
-## Getting Started
-
-1. Clone the repository
 2. Install dependencies:
    ```
    npm install
+   # or
+   yarn install
+   # or
+   bun install
    ```
-3. Set up environment variables as described above
+
+3. Create a `.env` file in the root directory with your Supabase credentials:
+   ```
+   VITE_SUPABASE_URL=your-supabase-url
+   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   ```
+
 4. Start the development server:
    ```
    npm run dev
+   # or
+   yarn dev
+   # or
+   bun dev
    ```
 
-## Data Flow
+5. Open your browser and navigate to `http://localhost:5173`
 
-- The application fetches ski resorts (3 mock resorts by default)
-- For each resort, the app uses liteAPI to fetch nearby hotel accommodations
-- These are combined into "destination packages" that users can vote on
-- Each package includes resort details, accommodation info, and pricing
+### Database Setup
 
-## Customization
+This application uses Supabase as the backend. You'll need to create the following tables in your Supabase project:
 
-You can modify the ski resorts in `src/models/mockData.ts` and adjust the LiteAPI search parameters in `src/services/apiService.ts` to target different destinations.
+- `users`: Store user information
+- `groups`: Store group information
+- `trips`: Store trip information
+- `destinations`: Store destination information
+- `votes`: Store user votes for destinations
 
-# Welcome to your Lovable project
+Refer to the `src/types/index.ts` file for the exact schema requirements.
 
-## Project info
+## Architecture
 
-**URL**: https://lovable.dev/projects/4f40fd76-f1db-41b2-95de-5d01494cb7be
+The application follows a component-based architecture with the following main directories:
 
-## How can I edit this code?
+- `src/components`: UI components
+- `src/pages`: Page components with routing
+- `src/services`: API and service functions
+- `src/hooks`: Custom React hooks
+- `src/types`: TypeScript type definitions
+- `src/integrations`: Third-party integrations (Supabase)
+- `src/utils`: Utility functions
 
-There are several ways of editing your application.
+## Key Trade-offs and Decisions
 
-**Use Lovable**
+### Client-side vs. Server-side
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/4f40fd76-f1db-41b2-95de-5d01494cb7be) and start prompting.
+- The application is primarily client-side rendered for simplicity and faster development.
+- This approach trades some SEO benefits for development speed and simplified deployment.
 
-Changes made via Lovable will be committed automatically to this repo.
+### Supabase as Backend
 
-**Use your preferred IDE**
+- Using Supabase provides a complete backend solution without requiring a custom server.
+- Trade-off: Limited to Supabase's feature set, but significantly reduced backend development time.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Local Storage for User Data Caching
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Some user data is cached in local storage for better performance.
+- Trade-off: Potential data staleness vs. reduced API calls.
 
-Follow these steps:
+### UI Component Library
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Using Shadcn UI (built on Radix UI) provides accessible, customizable components.
+- Trade-off: Additional learning curve but higher quality UI with less custom code.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### React Query for Data Fetching
 
-# Step 3: Install the necessary dependencies.
-npm i
+- Provides caching, refetching, and synchronization with minimal boilerplate.
+- Trade-off: Additional dependency but significantly improved data handling capabilities.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## AI Tools Integration
 
-**Edit a file directly in GitHub**
+This project leveraged several AI tools throughout the development process:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Tools and Their Contributions
 
-**Use GitHub Codespaces**
+- **Cursor**: Primary AI-powered IDE used for coding, debugging, research, and planning. Cursor's code assistance capabilities significantly accelerated development across all aspects of the project.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Claude**: Utilized primarily for UI/UX design decisions, helping to create a cohesive and intuitive interface while maintaining design consistency throughout the application.
 
-## What technologies are used for this project?
+- **Lovable**: Applied for code generation and architecture planning, particularly useful for outlining component structures and service patterns.
 
-This project is built with:
+- **Gemini**: Employed for debugging complex issues and conducting technical research on libraries and implementation approaches.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Impact on Development
 
-## How can I deploy this project?
+The integration of these AI tools dramatically transformed the development workflow:
 
-Simply open [Lovable](https://lovable.dev/projects/4f40fd76-f1db-41b2-95de-5d01494cb7be) and click on Share -> Publish.
+- **Accelerated Learning**: Reduced the learning curve for new technologies and libraries by providing contextual examples and explanations, making it possible to adopt and implement modern tools quickly.
 
-## Can I connect a custom domain to my Lovable project?
+- **Rapid Prototyping**: Enabled much faster creation of working prototypes, reducing what would typically take months to days of development time.
 
-Yes, you can!
+- **Enhanced Problem Solving**: Simplified debugging processes by suggesting potential solutions and identifying common pitfalls.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **Architecture Planning**: Facilitated better planning for large-scale application structure through intelligent suggestions and pattern recognition.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Challenges and Limitations
+
+While AI tools provided substantial benefits, they weren't without limitations:
+
+- AI assistance struggled with highly complex tasks requiring deep domain expertise
+- Complex debugging scenarios sometimes required traditional manual troubleshooting
+- Large-scale application architecture still benefited from human experience and oversight
+
+Despite these limitations, AI tools made previously challenging tasks accessible and significantly compressed development timelines, enabling the creation of a more robust application in less time.
+
+## Next Steps and Future Improvements
+
+1. **Real-time Collaboration**
+   - Implement Supabase real-time subscriptions for live updates
+   - Add chat functionality for group communication
+
+2. **Enhanced Trip Management**
+   - Itinerary planning
+   - Cost splitting calculator
+   - Weather forecasts for destinations
+
+3. **Authentication Enhancements**
+   - Add social logins (Google, Facebook)
+   - Implement two-factor authentication
+
+4. **Performance Optimizations**
+   - Implement code splitting
+   - Add service worker for offline support
+   - Optimize bundle size
+
+5. **Data Integrity**
+   - Add more comprehensive validation
+   - Implement database rules for better security
+
+6. **Testing**
+   - Add unit tests with Vitest
+   - Add integration tests with Testing Library
+   - Add end-to-end tests with Cypress
+
+7. **Mobile Experience**
+   - Consider developing a mobile app using React Native or Flutter
+   - Add push notifications for important updates
+
+## License
+
+This project is licensed under the MIT License.
