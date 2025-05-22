@@ -80,15 +80,15 @@ const GroupDashboard = () => {
   
   if (loading || tripLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
+      <div className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex items-center justify-center px-3 md:px-4">
+        <div className="flex flex-col items-center space-y-3 md:space-y-4">
           <div className="relative">
             <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 opacity-30 blur-md animate-pulse"></div>
-            <div className="relative p-6 bg-white rounded-full shadow-xl">
-              <Snowflake className="h-10 w-10 text-sky-600 animate-pulse" />
+            <div className="relative p-4 md:p-6 bg-white rounded-full shadow-xl">
+              <Snowflake className="h-8 w-8 md:h-10 md:w-10 text-sky-600 animate-pulse" />
             </div>
           </div>
-          <p className="text-slate-600 font-medium animate-pulse">Loading your ski trip...</p>
+          <p className="text-slate-600 font-medium animate-pulse text-sm md:text-base text-center">Loading your ski trip...</p>
         </div>
       </div>
     );
@@ -96,19 +96,19 @@ const GroupDashboard = () => {
   
   if (!groupId || !currentUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex items-center justify-center p-4">
-        <div className="p-12 border-2 border-dashed border-slate-200 bg-white/80 backdrop-blur-sm rounded-xl text-center max-w-md">
-          <div className="flex flex-col items-center gap-4">
-            <div className="p-4 rounded-full bg-gradient-to-br from-amber-400/20 to-red-600/20">
-              <AlertTriangle className="h-10 w-10 text-amber-600" />
+      <div className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex items-center justify-center p-3 md:p-4">
+        <div className="p-6 md:p-12 border-2 border-dashed border-slate-200 bg-white/80 backdrop-blur-sm rounded-xl text-center max-w-md w-full">
+          <div className="flex flex-col items-center gap-3 md:gap-4">
+            <div className="p-3 md:p-4 rounded-full bg-gradient-to-br from-amber-400/20 to-red-600/20">
+              <AlertTriangle className="h-8 w-8 md:h-10 md:w-10 text-amber-600" />
             </div>
-            <h3 className="text-xl font-semibold text-slate-800">Invalid Group</h3>
-            <p className="text-slate-600 mb-4">
+            <h3 className="text-lg md:text-xl font-semibold text-slate-800">Invalid Group</h3>
+            <p className="text-slate-600 mb-2 md:mb-4 text-sm md:text-base">
               We couldn't find the group you're looking for. This might be due to an invalid link or you may not have permission to view this group.
             </p>
             <Button 
               onClick={() => navigate("/")}
-              className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200"
+              className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200 h-10 md:h-11 text-sm md:text-base w-full sm:w-auto"
             >
               Return Home
             </Button>
@@ -130,7 +130,7 @@ const GroupDashboard = () => {
         group={group}
       />
       
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-8">
         {/* Trip Status Header */}
         <TripStatusHeader 
           tripStatus={trip?.status || "voting"}
@@ -143,7 +143,7 @@ const GroupDashboard = () => {
         
         {/* Destination Voting - ensure all props are passed correctly */}
         {(!trip || trip.status === "voting") && (
-          <div className="mt-8">
+          <div className="mt-4 md:mt-8">
             <DestinationVoting
               destinations={destinations || []}
               selectedDestination={selectedDestination}
@@ -158,7 +158,7 @@ const GroupDashboard = () => {
         
         {/* Trip Summary */}
         {trip && trip.status !== "voting" && selectedDestination && (
-          <div className="mt-8">
+          <div className="mt-4 md:mt-8">
             <TripSummary
               destination={selectedDestination}
               confirmedCount={confirmedCount}
@@ -172,7 +172,7 @@ const GroupDashboard = () => {
         <Separator className="border-slate-200" />
         
         {/* Participants List */}
-        <div className="mt-8">
+        <div className="mt-4 md:mt-8">
           <ParticipantsList
             participants={formattedParticipants}
             onUpdateStatus={handleUpdateStatus}
@@ -183,7 +183,7 @@ const GroupDashboard = () => {
           />
         </div>
         
-        <div className="mt-12 text-center text-sm text-slate-500 flex items-center justify-center gap-1">
+        <div className="mt-8 md:mt-12 text-center text-xs md:text-sm text-slate-500 flex items-center justify-center gap-1 px-4">
           <Snowflake className="h-3 w-3 text-sky-500 animate-pulse" />
           <span>Plan your perfect ski trip with friends</span>
           <Snowflake className="h-3 w-3 text-sky-500 animate-pulse" />
