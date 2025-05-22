@@ -3,9 +3,17 @@ import type { Destination, SkiResort, HotelAccommodation } from "@/types";
 
 // Update API base URL to use our proxy and version 3.0 of the API
 const LITE_API_BASE_URL = "/api/liteapi/v3.0";
-// We no longer need to include the API key in the frontend code
-// as it will be added by the proxy server
-const LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || "";
+// Check for API key in multiple possible locations to ensure Vercel compatibility
+const LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || 
+                    (typeof process !== 'undefined' && process.env && process.env.VITE_LITE_API_KEY) || 
+                    "";
+
+// Debug the environment variables available
+console.log("Environment variables available:", import.meta.env ? "Yes" : "No");
+if (import.meta.env) {
+  console.log("Environment keys:", Object.keys(import.meta.env).join(', '));
+}
+console.log("API Key detected:", LITE_API_KEY ? "Yes" : "No");
 
 /**
  * Debug utility to safely check response content before parsing

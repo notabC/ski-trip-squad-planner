@@ -21,8 +21,10 @@ export default defineConfig(({ mode }) => {
           configure: (proxy, _options) => {
             proxy.on('proxyReq', function(proxyReq, req, _res, _options) {
               // Add the API key header to the proxied request
-              const apiKey = env.VITE_LITE_API_KEY || '';
+              // Check for both VITE_LITE_API_KEY and LITE_API_KEY (for Vercel compatibility)
+              const apiKey = env.VITE_LITE_API_KEY || process.env.VITE_LITE_API_KEY || '';
               console.log(`Adding API key to request: ${apiKey ? '(key found)' : '(no key)'}`);
+              console.log(`Environment variables available: ${Object.keys(env).join(', ')}`);
               console.log(`Proxy request URL: ${req.url}`);
               console.log(`Request headers:`, req.headers);
               
