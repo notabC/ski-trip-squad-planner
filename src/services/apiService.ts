@@ -1,7 +1,5 @@
-
 import { mockDestinations, mockSkiResorts, mockAccommodations } from "@/models/mockData";
 import type { Destination, SkiResort, HotelAccommodation } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
 
 // Update API base URLs to handle both development and production environments
 const isProduction = import.meta.env.PROD;
@@ -10,42 +8,7 @@ const LITE_API_BASE_URL = isProduction
   : "/api/liteapi/v3.0";  // Use proxy in development
 
 // API key handling
-let LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || "";
-
-// Function to get API key - will try to get it from Supabase secrets in production
-const getLiteApiKey = async (): Promise<string> => {
-  if (!isProduction) {
-    return LITE_API_KEY;
-  }
-  
-  // If we're in production and already fetched the key, return it
-  if (isProduction && LITE_API_KEY) {
-    return LITE_API_KEY;
-  }
-  
-  try {
-    // Try to get the API key from Supabase secrets
-    const { data, error } = await supabase.functions.invoke('get-secret', {
-      body: { secretName: 'VITE_LITE_API_KEY' }
-    });
-    
-    if (error) {
-      console.error('Error fetching API key from Supabase:', error);
-      return "";
-    }
-    
-    if (data && data.secret) {
-      LITE_API_KEY = data.secret;
-      console.log('Successfully fetched API key from Supabase');
-      return data.secret;
-    }
-    
-    return "";
-  } catch (error) {
-    console.error('Error fetching API key:', error);
-    return "";
-  }
-};
+const LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || "";
 
 /**
  * Debug utility to safely check response content before parsing
@@ -183,9 +146,7 @@ const fetchHotelsForResort = async (
   checkOut: string, 
   limit: number = 2
 ): Promise<HotelAccommodation[]> => {
-  const apiKey = await getLiteApiKey();
-  
-  if (!apiKey) {
+  if (!LITE_API_KEY) {
     console.log(`No API key, using mock data for ${resort.name}`);
     return mockAccommodations.filter(acc => 
       acc.id.startsWith(`acc-${resort.id.split('-')[1]}`));
@@ -200,7 +161,7 @@ const fetchHotelsForResort = async (
     
     // Try fetching hotels using the hotels endpoint
     try {
-      console.log(`API Key detected: ${apiKey ? "Yes" : "No"}`);
+      console.log(`API Key detected: ${LITE_API_KEY ? "Yes" : "No"}`);
       
       // Use the correct endpoint path that matches the working curl example
       const hotelsEndpoint = `${LITE_API_BASE_URL}/data/hotels`;
@@ -221,8 +182,8 @@ const fetchHotelsForResort = async (
       };
       
       // In production, we need to add the API key to the headers directly
-      if (isProduction && apiKey) {
-        headers["X-API-Key"] = apiKey;
+      if (isProduction && LITE_API_KEY) {
+        headers["X-API-Key"] = LITE_API_KEY;
       }
       
       // Make the API call to get hotel list
