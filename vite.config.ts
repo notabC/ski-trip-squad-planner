@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -14,6 +15,7 @@ export default defineConfig(({ mode }) => {
       port: 8080,
       proxy: {
         // Proxy all requests to /api/liteapi to the actual liteAPI endpoint
+        // This is only used in development, in production we call the API directly
         '/api/liteapi': {
           target: 'https://api.liteapi.travel',
           changeOrigin: true,

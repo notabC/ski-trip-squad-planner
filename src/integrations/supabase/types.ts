@@ -206,13 +206,6 @@ export type Database = {
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "trips_selected_destination_id_fkey"
-            columns: ["selected_destination_id"]
-            isOneToOne: false
-            referencedRelation: "destinations"
-            referencedColumns: ["id"]
-          },
         ]
       }
       users: {
@@ -262,13 +255,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "votes_destination_id_fkey"
-            columns: ["destination_id"]
-            isOneToOne: false
-            referencedRelation: "destinations"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "votes_user_id_fkey"
             columns: ["user_id"]

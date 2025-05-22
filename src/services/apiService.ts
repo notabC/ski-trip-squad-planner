@@ -1,10 +1,13 @@
 import { mockDestinations, mockSkiResorts, mockAccommodations } from "@/models/mockData";
 import type { Destination, SkiResort, HotelAccommodation } from "@/types";
 
-// Update API base URL to use our proxy and version 3.0 of the API
-const LITE_API_BASE_URL = "/api/liteapi/v3.0";
-// We no longer need to include the API key in the frontend code
-// as it will be added by the proxy server
+// Update API base URLs to handle both development and production environments
+const isProduction = import.meta.env.PROD;
+const LITE_API_BASE_URL = isProduction 
+  ? "https://api.liteapi.travel/v3.0" // Use direct URL in production
+  : "/api/liteapi/v3.0";  // Use proxy in development
+
+// API key handling
 const LITE_API_KEY = import.meta.env.VITE_LITE_API_KEY || "";
 
 /**
@@ -27,6 +30,14 @@ const debugResponse = async (response: Response, actionDescription: string): Pro
   }
   
   try {
+    // Check if response starts with HTML - this indicates an error or redirect
+    if (responseText.trim().startsWith('<!DOCTYPE html>') || 
+        responseText.trim().startsWith('<html>')) {
+      console.error('Received HTML response instead of JSON');
+      // Return empty data to trigger fallback
+      return { data: [] };
+    }
+    
     return JSON.parse(responseText);
   } catch (error) {
     console.error('Failed to parse response:', responseText.substring(0, 200) + '...');
@@ -161,15 +172,24 @@ const fetchHotelsForResort = async (
         cityName
       });
       
-      console.log(`Making API call to: ${hotelsEndpoint}?${hotelSearchParams.toString()}`);
+      const requestUrl = `${hotelsEndpoint}?${hotelSearchParams.toString()}`;
+      console.log(`Making API call to: ${requestUrl}`);
+      
+      // Prepare headers - include API key directly in headers if in production
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "accept": "application/json"
+      };
+      
+      // In production, we need to add the API key to the headers directly
+      if (isProduction && LITE_API_KEY) {
+        headers["X-API-Key"] = LITE_API_KEY;
+      }
       
       // Make the API call to get hotel list
-      const hotelResponse = await fetch(`${hotelsEndpoint}?${hotelSearchParams}`, {
+      const hotelResponse = await fetch(requestUrl, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "accept": "application/json" // Add this header to match curl example
-        }
+        headers
       });
       
       console.log(`API Response status: ${hotelResponse.status}`);
@@ -180,24 +200,7 @@ const fetchHotelsForResort = async (
         throw new Error(`Failed to fetch hotels: ${hotelResponse.statusText}`);
       }
       
-      const responseText = await hotelResponse.text();
-      console.log(`API Response body length: ${responseText.length} characters`);
-      console.log(`API Response body preview:`, responseText.substring(0, 100));
-      
-      if (!responseText || responseText.trim() === '') {
-        console.error('Empty response received from API');
-        throw new Error('Empty response received from API');
-      }
-      
-      let hotelData;
-      try {
-        hotelData = JSON.parse(responseText);
-        console.log(`Successfully parsed JSON response with ${hotelData.data?.length || 0} hotels`);
-      } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError);
-        console.log('Response text preview:', responseText.substring(0, 200));
-        throw new Error(`Invalid JSON response: ${parseError.message}`);
-      }
+      const hotelData = await debugResponse(hotelResponse, `hotel search for ${resort.name}`);
       
       if (!hotelData.data || !Array.isArray(hotelData.data) || hotelData.data.length === 0) {
         console.log(`No hotels found in API response for ${resort.name} in ${cityName}`);
