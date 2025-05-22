@@ -84,9 +84,17 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         
         setDestinations(fetchedDestinations);
         
-        // Handle User Vote
+        // Handle User Vote - make multiple attempts if needed
         if (currentUser) {
-          const serverUserVote = await getUserVote(currentUser.id);
+          let serverUserVote = await getUserVote(currentUser.id);
+          
+          // If no vote is found but we think there should be one, retry
+          if (!serverUserVote && lastOptimisticUserVoteRef.current) {
+            console.log("No vote found on first attempt but optimistic vote exists, retrying...");
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+            serverUserVote = await getUserVote(currentUser.id);
+          }
+          
           let finalUserVote = serverUserVote;
           if (lastOptimisticUserVoteRef.current && lastOptimisticUserVoteRef.current.userId === currentUser.id) {
             if (!serverUserVote || lastOptimisticUserVoteRef.current.timestamp > serverUserVote.timestamp) {
@@ -94,11 +102,25 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
               console.log("Preserving optimistic user vote for setUserVote:", finalUserVote);
             }
           }
-          setUserVote(finalUserVote);
+          
+          if (finalUserVote) {
+            console.log("Setting user vote:", finalUserVote);
+            setUserVote(finalUserVote);
+          } else {
+            console.log("No user vote found for userId:", currentUser.id);
+          }
         }
 
-        // Handle All Votes
-        const serverAllVotes = await getVotesByGroupId(groupId);
+        // Handle All Votes - with retry logic
+        let serverAllVotes = await getVotesByGroupId(groupId);
+        
+        // If we expect votes but none are found, retry
+        if ((serverAllVotes.length === 0) && userVote) {
+          console.log("No group votes found on first attempt but user vote exists, retrying...");
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+          serverAllVotes = await getVotesByGroupId(groupId);
+        }
+        
         let finalAllVotes = [...serverAllVotes];
         if (lastOptimisticUserVoteRef.current && currentUser && lastOptimisticUserVoteRef.current.userId === currentUser.id) {
           const optimisticVote = lastOptimisticUserVoteRef.current;
@@ -114,6 +136,8 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
             console.log("Merged optimistic vote into allVotes (addition)");
           }
         }
+        
+        console.log(`Setting all votes: ${finalAllVotes.length} votes`);
         setAllVotes(finalAllVotes);
         
         // Clear optimistic vote ref after it has been merged/considered for both userVote and allVotes
@@ -179,12 +203,15 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
     isVotingInProgressRef.current = true;
     const previousUserVote = userVote ? { ...userVote } : null;
 
+    // Create an optimistic vote to immediately update the UI
     const optimisticVote: Vote = {
       userId: currentUser.id,
       destinationId,
       timestamp: Date.now(),
     };
 
+    // Apply optimistic update
+    console.log("Applying optimistic vote update:", optimisticVote);
     setUserVote(optimisticVote);
     setAllVotes(prevAllVotes => 
       prevAllVotes
@@ -195,10 +222,35 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
 
     try {
       console.log("Casting vote for destination:", destinationId);
-      await castVote(currentUser.id, destinationId);
+      // castVote now returns the actual saved vote
+      const savedVote = await castVote(currentUser.id, destinationId);
+      console.log("Vote successfully cast and returned:", savedVote);
+      
+      // Use the actual saved vote from the server
+      setUserVote(savedVote);
+      setAllVotes(prevAllVotes => {
+        const newVotes = prevAllVotes.filter(vote => vote.userId !== currentUser.id);
+        newVotes.push(savedVote);
+        return newVotes;
+      });
+      
+      // Clear the optimistic vote ref as we now have the real server data
+      lastOptimisticUserVoteRef.current = null;
+      
       toast({ title: "Vote cast", description: "Your vote has been recorded" });
+      
+      // Get all votes to ensure UI is consistent with server state
+      console.log("Refreshing all votes after successful vote");
+      const freshAllVotes = await getVotesByGroupId(groupId);
+      if (freshAllVotes && freshAllVotes.length > 0) {
+        console.log(`Retrieved ${freshAllVotes.length} votes from server:`, freshAllVotes);
+        setAllVotes(freshAllVotes);
+      } else {
+        console.warn("No votes returned from getVotesByGroupId after successful vote");
+      }
     } catch (error: any) {
-      console.error("Error casting vote in useTripManagement:", JSON.stringify(error, null, 2));
+      console.error("Error casting vote in useTripManagement:", error instanceof Error ? error.message : JSON.stringify(error, null, 2));
+      
       // Rollback optimistic updates
       setUserVote(previousUserVote);
       setAllVotes(prevAllVotes => {
@@ -208,12 +260,15 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
         }
         return rolledBack;
       });
-      lastOptimisticUserVoteRef.current = previousUserVote; // Or null if it was null
-      toast({ title: "Error", description: (error.message || "Failed to cast vote. Please try again."), variant: "destructive" });
+      lastOptimisticUserVoteRef.current = previousUserVote;
+      
+      toast({ 
+        title: "Error", 
+        description: (error instanceof Error ? error.message : "Failed to cast vote. Please try again."), 
+        variant: "destructive" 
+      });
     } finally {
       isVotingInProgressRef.current = false;
-      // No immediate re-fetch here; rely on loadData to eventually pick up server state
-      // and merge with optimistic if necessary
     }
   };
   
@@ -400,6 +455,67 @@ export const useTripManagement = (groupId: string | undefined, currentUser: User
       }
     }
   }, [members, trip]);
+
+  // Effect for periodic vote data refreshing
+  useEffect(() => {
+    if (!groupId || !currentUser) return;
+
+    // Function to refresh votes only
+    const refreshVotes = async () => {
+      if (isVotingInProgressRef.current) {
+        console.log("Skipping vote refresh due to active voting operation");
+        return;
+      }
+
+      try {
+        // Fetch latest votes from server without affecting other state
+        console.log("Periodically refreshing vote data");
+        const freshUserVote = await getUserVote(currentUser.id);
+        const freshAllVotes = await getVotesByGroupId(groupId);
+
+        if (freshUserVote) {
+          setUserVote(prev => {
+            // Only update if the server data is different
+            if (!prev || prev.destinationId !== freshUserVote.destinationId) {
+              console.log("Updating user vote from refresh:", freshUserVote);
+              return freshUserVote;
+            }
+            return prev;
+          });
+        }
+
+        if (freshAllVotes && freshAllVotes.length > 0) {
+          setAllVotes(prev => {
+            // Only update if there's a difference in votes
+            const hasChanges = freshAllVotes.length !== prev.length || 
+              freshAllVotes.some(newVote => {
+                const existingVote = prev.find(v => v.userId === newVote.userId);
+                return !existingVote || existingVote.destinationId !== newVote.destinationId;
+              });
+              
+            if (hasChanges) {
+              console.log(`Refreshed ${freshAllVotes.length} votes from server`);
+              return freshAllVotes;
+            }
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error("Error refreshing vote data:", error);
+        // Don't show toast for background refresh errors to avoid annoying users
+      }
+    };
+
+    // Perform initial refresh
+    refreshVotes();
+
+    // Set up periodic refresh (every 30 seconds)
+    const intervalId = setInterval(refreshVotes, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [groupId, currentUser?.id]);
 
   return {
     group, members, destinations, userVote, allVotes, trip, selectedDestination,

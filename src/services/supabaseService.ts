@@ -1281,132 +1281,222 @@ export const getDestinationById = async (id: string): Promise<Destination | null
 };
 
 // Voting methods
-export const castVote = async (userId: string, destinationId: string): Promise<void> => {
-  const { error: deleteError } = await supabase
-    .from('votes')
-    .delete()
-    .eq('user_id', userId);
-  if (deleteError) {
-    console.error('Error deleting existing vote:', JSON.stringify(deleteError, null, 2));
-    throw deleteError;
-  }
+export const castVote = async (userId: string, destinationId: string): Promise<Vote> => {
+  try {
+    console.log(`castVote called with userId: ${userId}, destinationId: ${destinationId}`);
+    
+    console.log(`About to delete any existing votes for user: ${userId}`);
+    
+    // First delete any existing votes for this user
+    const { error: deleteError } = await supabase
+      .from('votes')
+      .delete()
+      .eq('user_id', userId);
+      
+    if (deleteError) {
+      console.error('Error deleting existing vote:', JSON.stringify(deleteError, null, 2));
+      throw deleteError;
+    }
+    
+    console.log(`Successfully deleted any existing votes for user: ${userId}`);
+    console.log(`About to insert new vote with destination_id: ${destinationId}`);
 
-  const { error: insertError } = await supabase
-    .from('votes')
-    .insert([
-      {
-        user_id: userId,
-        destination_id: destinationId,
-        timestamp: new Date().toISOString() // satisfy NOT NULL constraint
-      }
-    ])
-    .select();
-  if (insertError) {
-    console.error('Error casting vote (inserting new vote):', JSON.stringify(insertError, null, 2));
-    throw insertError;
+    // Create timestamp
+    const timestamp = new Date().toISOString();
+
+    // Store the client-side ID directly in the database
+    const { data: insertedVote, error: insertError } = await supabase
+      .from('votes')
+      .insert([
+        {
+          user_id: userId,
+          destination_id: destinationId,
+          timestamp: timestamp
+        }
+      ])
+      .select()
+      .single();
+      
+    if (insertError || !insertedVote) {
+      console.error('Error casting vote (inserting new vote):', JSON.stringify(insertError, null, 2));
+      throw insertError || new Error('Failed to insert vote');
+    }
+    
+    console.log(`Successfully inserted vote:`, insertedVote);
+    
+    // Return vote info with original destinationId
+    return {
+      userId,
+      destinationId,
+      timestamp: new Date(timestamp).getTime()
+    };
+  } catch (error) {
+    console.error('Error in castVote:', error);
+    throw error;
   }
 };
 
 export const getVotesByGroupId = async (groupId: string): Promise<Vote[]> => {
-  // Get all members of the group
-  const { data: memberships } = await supabase
-    .from('group_members')
-    .select('user_id')
-    .eq('group_id', groupId);
-  
-  if (!memberships || memberships.length === 0) {
+  try {
+    console.log(`Getting votes for group: ${groupId}`);
+    
+    // Get all members of the group
+    const { data: memberships, error: memberError } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupId);
+    
+    if (memberError) {
+      console.error('Error fetching group members:', memberError);
+      return [];
+    }
+    
+    if (!memberships || memberships.length === 0) {
+      console.log(`No members found for group: ${groupId}`);
+      return [];
+    }
+    
+    const memberIds = memberships.map(m => m.user_id);
+    console.log(`Found ${memberIds.length} members in group`);
+    
+    // Get all votes by these members
+    const { data: votes, error } = await supabase
+      .from('votes')
+      .select('*')
+      .in('user_id', memberIds);
+    
+    if (error) {
+      console.error('Error getting votes:', error);
+      return [];
+    }
+    
+    if (!votes || votes.length === 0) {
+      console.log(`No votes found for group members`);
+      return [];
+    }
+    
+    console.log(`Found ${votes.length} votes for group members:`, votes);
+    
+    // Simply map the vote data to our Vote interface
+    const resultVotes = votes.map(vote => ({
+      userId: vote.user_id,
+      destinationId: vote.destination_id,
+      timestamp: new Date(vote.timestamp).getTime()
+    }));
+    
+    console.log(`Returning ${resultVotes.length} votes for group:`, resultVotes);
+    return resultVotes;
+  } catch (error) {
+    console.error('Error in getVotesByGroupId:', error);
     return [];
   }
-  
-  const memberIds = memberships.map(m => m.user_id);
-  
-  // Get all votes by these members
-  const { data: votes, error } = await supabase
-    .from('votes')
-    .select('*')
-    .in('user_id', memberIds);
-  
-  if (error || !votes) {
-    console.error('Error getting votes:', error);
-    return [];
-  }
-  
-  return votes.map(v => ({
-    userId: v.user_id,
-    destinationId: v.destination_id,
-    timestamp: new Date(v.timestamp).getTime()
-  }));
 };
 
 export const getUserVote = async (userId: string): Promise<Vote | null> => {
-  const { data, error } = await supabase
-    .from('votes')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle(); // allow 0 rows without 406
-  if (error || !data) return null;
-  return {
-    userId: data.user_id,
-    destinationId: data.destination_id,
-    timestamp: new Date(data.timestamp).getTime()
-  };
+  try {
+    console.log(`Getting vote for user: ${userId}`);
+    
+    const { data, error } = await supabase
+      .from('votes')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle(); // allow 0 rows without 406
+      
+    if (error) {
+      console.error('Error fetching vote:', error);
+      return null;
+    }
+    
+    if (!data) {
+      console.log(`No vote found for user: ${userId}`);
+      return null;
+    }
+    
+    console.log(`Found vote in database:`, data);
+    
+    // Simply use the client-side ID stored directly in the database
+    return {
+      userId: data.user_id,
+      destinationId: data.destination_id,
+      timestamp: new Date(data.timestamp).getTime()
+    };
+  } catch (error) {
+    console.error('Error in getUserVote:', error);
+    return null;
+  }
 };
 
 export const finalizeVoting = async (groupId: string): Promise<Trip | null> => {
-  // Get all votes for this group
-  const votes = await getVotesByGroupId(groupId);
-  
-  if (votes.length === 0) {
-    return null;
-  }
-  
-  // Count votes for each destination
-  const voteCounts: Record<string, number> = {};
-  votes.forEach((vote) => {
-    voteCounts[vote.destinationId] = (voteCounts[vote.destinationId] || 0) + 1;
-  });
-  
-  // Find destination with most votes
-  let selectedDestinationId = "";
-  let maxVotes = 0;
-  Object.entries(voteCounts).forEach(([destId, count]) => {
-    if (count > maxVotes) {
-      maxVotes = count;
-      selectedDestinationId = destId;
+  try {
+    // Get all votes for this group
+    const votes = await getVotesByGroupId(groupId);
+    
+    if (votes.length === 0) {
+      console.log('No votes found for group:', groupId);
+      return null;
     }
-  });
-  
-  if (!selectedDestinationId) {
+    
+    console.log('Finalizing votes:', votes);
+    
+    // Count votes for each destination
+    const voteCounts: Record<string, number> = {};
+    votes.forEach((vote) => {
+      voteCounts[vote.destinationId] = (voteCounts[vote.destinationId] || 0) + 1;
+    });
+    
+    console.log('Vote counts:', voteCounts);
+    
+    // Find destination with most votes
+    let selectedDestinationId = "";
+    let maxVotes = 0;
+    Object.entries(voteCounts).forEach(([destId, count]) => {
+      if (count > maxVotes) {
+        maxVotes = count;
+        selectedDestinationId = destId;
+      }
+    });
+    
+    if (!selectedDestinationId) {
+      console.log('No winning destination found');
+      return null;
+    }
+    
+    console.log('Selected destination ID:', selectedDestinationId);
+    
+    // Get the trip for this group
+    const { data: tripData } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('group_id', groupId)
+      .single();
+    
+    if (!tripData) {
+      console.log('No trip found for group:', groupId);
+      return null;
+    }
+    
+    console.log(`Updating trip ${tripData.id} with selected destination ${selectedDestinationId}`);
+    
+    // Update the trip with the client-side destination ID
+    const { error: updateError } = await supabase
+      .from('trips')
+      .update({
+        selected_destination_id: selectedDestinationId,
+        status: 'confirmed'
+      })
+      .eq('id', tripData.id);
+    
+    if (updateError) {
+      console.error('Error finalizing voting:', updateError);
+      return null;
+    }
+    
+    // Return the updated trip
+    return getGroupTrip(groupId);
+  } catch (error) {
+    console.error('Error in finalizeVoting:', error);
     return null;
   }
-  
-  // Get the trip for this group
-  const { data: tripData } = await supabase
-    .from('trips')
-    .select('id')
-    .eq('group_id', groupId)
-    .single();
-  
-  if (!tripData) {
-    return null;
-  }
-  
-  // Update the trip
-  const { error: updateError } = await supabase
-    .from('trips')
-    .update({
-      selected_destination_id: selectedDestinationId,
-      status: 'confirmed'
-    })
-    .eq('id', tripData.id);
-  
-  if (updateError) {
-    console.error('Error finalizing voting:', updateError);
-    return null;
-  }
-  
-  // Return the updated trip
-  return getGroupTrip(groupId);
 };
 
 // Add a new function to get user by ID

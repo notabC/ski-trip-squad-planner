@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Destination, Vote } from "@/types";
-import { CalendarIcon, MapPinIcon, DollarSignIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, HomeIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { MapPinIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { formatCurrency, parseHtml } from "@/utils/formatters";
 
 interface DestinationCardProps {
@@ -120,32 +120,6 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
                 </>
               )}
             </button>
-          </div>
-          
-          {/* Amenities display */}
-          <div className="space-y-1">
-            <div className="text-xs font-medium">Amenities:</div>
-            <div className="flex flex-wrap gap-1">
-              {destination.accommodation.amenities.slice(0, 3).map((amenity, index) => (
-                <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
-                  {amenity}
-                </Badge>
-              ))}
-              {destination.accommodation.amenities.length > 3 && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                  +{destination.accommodation.amenities.length - 3} more
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-          <div className="flex items-center">
-            <CalendarIcon size={14} className="mr-1" />
-            <span>
-              {new Date(destination.dates.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(destination.dates.end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </span>
           </div>
         </div>
         
