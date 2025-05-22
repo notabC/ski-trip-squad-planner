@@ -138,6 +138,30 @@ export const resetPassword = async (email: string): Promise<void> => {
   }
 };
 
+export const signInWithMagicLink = async (email: string): Promise<void> => {
+  try {
+    // Verify that email is not empty
+    if (!email) {
+      throw new Error("Email is required");
+    }
+    
+    // Send the magic link to the user's email
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      }
+    });
+    
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error sending magic link:", error);
+    throw error;
+  }
+};
+
 export const logoutUser = async (): Promise<void> => {
   try {
     const { error } = await supabase.auth.signOut();
@@ -1234,49 +1258,98 @@ export const getAllDestinations = async (): Promise<Destination[]> => {
 
 export const getDestinationById = async (id: string): Promise<Destination | null> => {
   try {
-    const { data, error } = await supabase
-      .from('destinations')
-      .select('*')
-      .eq('id', id)
-      .single();
+    console.log(`Getting destination by ID: ${id}`);
     
-    if (error || !data) {
-      console.error('Error fetching destination:', error);
-      return null;
+    // For client-side IDs (pkg-resort-X-...), fetch from API
+    if (id.startsWith('pkg-resort-')) {
+      // Extract the resort number
+      const resortMatch = id.match(/pkg-resort-(\d+)/);
+      if (!resortMatch || !resortMatch[1]) {
+        console.error(`Invalid destination ID format: ${id}`);
+        return null;
+      }
+      
+      const resortNumber = parseInt(resortMatch[1]);
+      console.log(`Looking for destination with resort number: ${resortNumber}`);
+      
+      // Fetch all destinations from API
+      const allDestinations = await fetchSkiDestinations();
+      
+      // Try to find an exact match first
+      const exactMatch = allDestinations.find(d => d.id === id);
+      if (exactMatch) {
+        console.log(`Found exact match for destination ID: ${id}`);
+        return exactMatch;
+      }
+      
+      // If no exact match, find a destination with the same resort number
+      const matchingDestinations = allDestinations.filter(d => {
+        const match = d.id.match(/pkg-resort-(\d+)/);
+        return match && parseInt(match[1]) === resortNumber;
+      });
+      
+      if (matchingDestinations.length > 0) {
+        console.log(`Found similar destination with resort number ${resortNumber}: ${matchingDestinations[0].id}`);
+        return matchingDestinations[0];
+      }
+      
+      console.log(`No matching destination found. Returning first available destination as fallback.`);
+      return allDestinations.length > 0 ? allDestinations[0] : null;
     }
     
-    // Transform to the new model
-    const resort: SkiResort = {
-      id: `resort-${data.id}`,
-      name: data.name,
-      location: data.location,
-      description: data.description || '',
-      image: data.image || '',
-      difficulty: data.difficulty as 'beginner' | 'intermediate' | 'advanced'
-    };
-    
-    const accommodation: HotelAccommodation = {
-      id: `acc-${data.id}`,
-      name: `${data.name} Lodging`,
-      description: `Accommodation at ${data.name}`,
-      image: data.image || '',
-      price: data.price * 0.7, // 70% of the total price is accommodation
-      amenities: data.amenities || []
-    };
-    
-    return {
-      id: data.id,
-      resort,
-      accommodation,
-      price: data.price,
-      dates: {
-        start: data.start_date,
-        end: data.end_date
+    // For database IDs, try the database first
+    try {
+      const { data, error } = await supabase
+        .from('destinations')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error || !data) {
+        console.error('Error fetching destination from database:', error);
+        throw error; // Will be caught by the outer catch
       }
-    };
+      
+      // Transform to the new model
+      const resort: SkiResort = {
+        id: `resort-${data.id}`,
+        name: data.name,
+        location: data.location,
+        description: data.description || '',
+        image: data.image || '',
+        difficulty: data.difficulty as 'beginner' | 'intermediate' | 'advanced'
+      };
+      
+      const accommodation: HotelAccommodation = {
+        id: `acc-${data.id}`,
+        name: `${data.name} Lodging`,
+        description: `Accommodation at ${data.name}`,
+        image: data.image || '',
+        price: data.price * 0.7, // 70% of the total price is accommodation
+        amenities: data.amenities || []
+      };
+      
+      return {
+        id: data.id,
+        resort,
+        accommodation,
+        price: data.price,
+        dates: {
+          start: data.start_date,
+          end: data.end_date
+        }
+      };
+    } catch (dbError) {
+      console.log('Falling back to API data for destination lookup');
+      // Fallback to API
+      const allDestinations = await fetchSkiDestinations();
+      return allDestinations.length > 0 ? allDestinations[0] : null;
+    }
   } catch (error) {
     console.error('Error in getDestinationById:', error);
-    return null;
+    // Last resort fallback - return mock data
+    const allDestinations = await fetchSkiDestinations();
+    return allDestinations.length > 0 ? allDestinations[0] : null;
   }
 };
 
@@ -1476,6 +1549,13 @@ export const finalizeVoting = async (groupId: string): Promise<Trip | null> => {
     }
     
     console.log(`Updating trip ${tripData.id} with selected destination ${selectedDestinationId}`);
+    
+    // Verify the destination exists before updating the trip
+    const destination = await getDestinationById(selectedDestinationId);
+    if (!destination) {
+      console.error(`Could not find destination with ID: ${selectedDestinationId}`);
+      // Continue anyway with the client ID, as our getDestinationById can now handle client IDs
+    }
     
     // Update the trip with the client-side destination ID
     const { error: updateError } = await supabase

@@ -1,14 +1,14 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { registerUser, signInUser, resetPassword, saveCurrentUser } from "@/services/supabaseService";
+import { registerUser, signInUser, resetPassword, saveCurrentUser, signInWithMagicLink } from "@/services/supabaseService";
 import { toast } from "@/components/ui/use-toast";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 
 const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }) => {
   // Sign Up state
@@ -23,9 +23,13 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
   // Reset password state
   const [resetEmail, setResetEmail] = useState("");
   
+  // Magic link state
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup" | "reset">("signin");
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "reset" | "magic">("signin");
   const [errorMessage, setErrorMessage] = useState("");
   
   const validateEmail = (email: string) => {
@@ -142,6 +146,39 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
       setIsSubmitting(false);
     }
   };
+  
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
+    
+    if (!magicLinkEmail) {
+      setErrorMessage("Please provide your email");
+      return;
+    }
+    
+    if (!validateEmail(magicLinkEmail)) {
+      setErrorMessage("Please provide a valid email address");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await signInWithMagicLink(magicLinkEmail);
+      
+      setMagicLinkSent(true);
+      
+      toast({
+        title: "Magic link sent!",
+        description: "Check your email for a link to sign in",
+      });
+    } catch (error: any) {
+      console.error("Magic link error:", error);
+      setErrorMessage(error.message || "Failed to send magic link. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-md mx-auto mt-8">
@@ -153,7 +190,7 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
           </CardDescription>
         </CardHeader>
         
-        <Tabs value={authMode} onValueChange={(value) => setAuthMode(value as "signin" | "signup" | "reset")}>
+        <Tabs value={authMode} onValueChange={(value) => setAuthMode(value as "signin" | "signup" | "reset" | "magic")}>
           <div className="px-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -205,13 +242,29 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
                   />
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col space-y-3">
                 <Button 
                   type="submit" 
                   className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Signing in..." : "Sign In"}
+                </Button>
+                
+                <div className="flex items-center w-full">
+                  <Separator className="flex-1" />
+                  <span className="mx-2 text-xs text-muted-foreground">OR</span>
+                  <Separator className="flex-1" />
+                </div>
+                
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setAuthMode("magic")}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Sign in with Magic Link
                 </Button>
               </CardFooter>
             </form>
@@ -255,13 +308,29 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
                   <p className="text-xs text-muted-foreground">Password must be at least 6 characters</p>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col space-y-3">
                 <Button 
                   type="submit" 
                   className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Signing up..." : "Sign Up"}
+                </Button>
+                
+                <div className="flex items-center w-full">
+                  <Separator className="flex-1" />
+                  <span className="mx-2 text-xs text-muted-foreground">OR</span>
+                  <Separator className="flex-1" />
+                </div>
+                
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setAuthMode("magic")}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Sign in with Magic Link
                 </Button>
               </CardFooter>
             </form>
@@ -300,6 +369,78 @@ const AuthForm: React.FC<{ onAuthenticated: () => void }> = ({ onAuthenticated }
                   variant="ghost"
                   className="w-full"
                   onClick={() => setAuthMode("signin")}
+                >
+                  Back to Sign In
+                </Button>
+              </CardFooter>
+            </form>
+          </TabsContent>
+          
+          <TabsContent value="magic">
+            <form onSubmit={handleMagicLink}>
+              <CardContent className="space-y-4 pt-4">
+                {!magicLinkSent ? (
+                  <>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Sign in without a password. We'll send a magic link to your email that will let you sign in instantly.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="magic-email">Email Address</Label>
+                      <Input
+                        id="magic-email"
+                        type="email"
+                        placeholder="john@example.com"
+                        value={magicLinkEmail}
+                        onChange={(e) => setMagicLinkEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4">
+                    <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <h3 className="text-lg font-medium">Check your email</h3>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      We've sent a magic link to <strong>{magicLinkEmail}</strong>
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-4">
+                      Click the link in the email to sign in instantly.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter className="flex flex-col space-y-2">
+                {!magicLinkSent ? (
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Sending..." : "Send Magic Link"}
+                  </Button>
+                ) : (
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      setMagicLinkEmail("");
+                      setMagicLinkSent(false);
+                    }}
+                  >
+                    Use a different email
+                  </Button>
+                )}
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setMagicLinkSent(false);
+                  }}
                 >
                   Back to Sign In
                 </Button>

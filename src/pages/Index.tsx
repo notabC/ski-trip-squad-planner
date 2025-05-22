@@ -227,7 +227,7 @@ const Index = () => {
                 onClick={handleCreateNewGroup}
                 variant="outline"
               >
-                Create New Group
+                Create or Join New Group
               </Button>
             </div>
             

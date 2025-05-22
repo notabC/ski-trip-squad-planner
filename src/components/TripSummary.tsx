@@ -106,8 +106,9 @@ const TripSummary: React.FC<TripSummaryProps> = ({
                     Accommodation
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {destination.accommodation.description}
+                <p className="text-sm text-muted-foreground"
+                  dangerouslySetInnerHTML={{ __html: destination.accommodation.description }}
+                >
                 </p>
                 
                 <div className="space-y-2">

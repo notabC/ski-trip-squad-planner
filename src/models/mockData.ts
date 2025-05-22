@@ -95,8 +95,8 @@ export const mockAccommodations: HotelAccommodation[] = [
   // For Snowy Peaks
   {
     id: "acc-3-1",
-    name: "Swiss Chalet",
-    description: "Traditional Swiss chalet combining old-world charm with modern amenities.",
+    name: "Mont Cervin Palace",
+    description: "<p><strong>Luxurious 5-Star Mont Cervin Palace in Zermatt</strong></p><p><strong>Relaxation and Indulgence</strong>: Enjoy the pool, 1,700 m² spa, and beauty treatments.</p><p><strong>Breathtaking Views and Comfort</strong>: Most rooms face south with Matterhorn views, some with hot tubs or fireplaces.</p><p><strong>Fine Dining and Entertainment</strong>: From rich breakfast buffets to gala dinners, Grill Le Cervin, and stylish bars.</p>",
     image: "/images/hotel-3-1.jpg",
     price: 1299,
     amenities: [
@@ -111,7 +111,7 @@ export const mockAccommodations: HotelAccommodation[] = [
   {
     id: "acc-3-2",
     name: "Alpine Budget Hotel",
-    description: "Affordable accommodations with all the essentials for a great ski trip.",
+    description: "<p><strong>Affordable Mountain Accommodations</strong></p><p>Comfortable and budget-friendly lodging with all the essentials for a great ski trip. Conveniently located near shuttle services to the slopes.</p><p><strong>Amenities include</strong>: Free breakfast, WiFi, ski storage, and access to a cozy common area with fireplace.</p>",
     image: "/images/hotel-3-2.jpg",
     price: 599,
     amenities: [
