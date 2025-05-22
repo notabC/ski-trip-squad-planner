@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Destination, Vote } from "@/types";
-import { MapPinIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { MapPinIcon, ThumbsUpIcon, UsersIcon, BedDoubleIcon, SnowflakeIcon, ChevronDownIcon, ChevronUpIcon, CalendarIcon, DollarSignIcon } from "lucide-react";
 import { formatCurrency, parseHtml } from "@/utils/formatters";
 
 interface DestinationCardProps {
@@ -32,81 +32,81 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
   const getDifficultyColor = (difficulty: Destination["resort"]["difficulty"]) => {
     switch (difficulty) {
       case "beginner":
-        return "bg-green-500";
+        return "from-green-400 to-green-600";
       case "intermediate":
-        return "bg-blue-500";
+        return "from-blue-400 to-blue-600";
       case "advanced":
-        return "bg-red-500";
+        return "from-red-400 to-red-600";
       default:
-        return "bg-gray-500";
+        return "from-gray-400 to-gray-600";
     }
   };
 
   return (
-    <Card className={`overflow-hidden transition-all duration-300 hover:shadow-lg ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}>
-      <div className="relative h-48 overflow-hidden">
+    <Card className={`border-0 overflow-hidden shadow-xl shadow-slate-200/50 bg-white/90 backdrop-blur-sm hover:shadow-blue-100/50 hover:translate-y-[-2px] transition-all duration-200 ${isSelected ? 'ring-2 ring-sky-400 shadow-lg shadow-sky-100/50' : ''}`}>
+      <div className="relative h-48 overflow-hidden group">
         <img
           src={destination.accommodation.image || destination.resort.image}
           alt={destination.accommodation.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         {isSelected && (
-          <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 rounded-bl-md font-medium">
+          <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-3 py-1 rounded-bl-md font-medium shadow-md">
             Selected!
           </div>
         )}
         <Badge 
-          className={`absolute bottom-2 right-2 ${getDifficultyColor(destination.resort.difficulty)}`}
+          className={`absolute bottom-2 right-2 bg-gradient-to-r ${getDifficultyColor(destination.resort.difficulty)} text-white border-0 shadow-md`}
         >
           {destination.resort.difficulty.charAt(0).toUpperCase() + destination.resort.difficulty.slice(1)}
         </Badge>
         
         {/* Vote count badge */}
-        <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1 rounded-md flex items-center gap-1.5 text-xs font-medium shadow-md">
+        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white px-3 py-1 rounded-md flex items-center gap-1.5 text-xs font-medium shadow-md">
           <UsersIcon size={14} />
           <span>{votesForDestination} {votesForDestination === 1 ? "vote" : "votes"}</span>
         </div>
       </div>
-      <CardHeader className="p-3">
+      <CardHeader className="p-4 bg-gradient-to-br from-sky-50 to-blue-50/50">
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold line-clamp-1">
+            <CardTitle className="text-base font-semibold line-clamp-1 text-slate-800">
               {destination.accommodation.name}
             </CardTitle>
-            <span className="text-sm font-semibold text-primary">
+            <span className="text-sm font-bold bg-gradient-to-r from-sky-600 to-blue-700 bg-clip-text text-transparent">
               {formatCurrency(destination.price)}
             </span>
           </div>
-          <div className="flex items-center text-sm text-muted-foreground">
-            <MapPinIcon size={14} className="mr-1" />
+          <div className="flex items-center text-sm text-slate-600">
+            <MapPinIcon size={14} className="mr-1 text-sky-500" />
             <span className="line-clamp-1">{destination.resort.location}</span>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 pt-0 space-y-3">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
-            <BedDoubleIcon size={16} className="mb-1 text-orange-500" />
-            <span className="text-xs font-medium">Accommodation</span>
-            <span className="text-xs line-clamp-1">{destination.accommodation.name}</span>
+      <CardContent className="p-4 pt-3 space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-gradient-to-br from-sky-400/10 to-blue-600/10 p-3 rounded-xl flex flex-col items-center shadow-sm">
+            <BedDoubleIcon size={16} className="mb-1 text-sky-600" />
+            <span className="text-xs font-medium text-slate-800">Accommodation</span>
+            <span className="text-xs text-slate-600 line-clamp-1">{destination.accommodation.name}</span>
           </div>
-          <div className="bg-secondary/30 p-2 rounded-md flex flex-col items-center">
-            <SnowflakeIcon size={16} className="mb-1 text-blue-500" />
-            <span className="text-xs font-medium">Resort</span>
-            <span className="text-xs line-clamp-1">{destination.resort.name}</span>
+          <div className="bg-gradient-to-br from-sky-400/10 to-blue-600/10 p-3 rounded-xl flex flex-col items-center shadow-sm">
+            <SnowflakeIcon size={16} className="mb-1 text-sky-600" />
+            <span className="text-xs font-medium text-slate-800">Resort</span>
+            <span className="text-xs text-slate-600 line-clamp-1">{destination.resort.name}</span>
           </div>
         </div>
         
         <div className="space-y-3">
           <div className="text-xs">
-            <div className="font-medium mb-1">Accommodation Details:</div>
+            <div className="font-medium mb-1 text-slate-800">Accommodation Details:</div>
             <div 
-              className={`${isDescriptionExpanded ? '' : 'line-clamp-3'} text-muted-foreground`}
+              className={`${isDescriptionExpanded ? '' : 'line-clamp-3'} text-slate-600`}
               {...parseHtml(destination.accommodation.description)}
             ></div>
             <button 
               onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-              className="text-primary hover:text-primary/80 text-xs flex items-center mt-1 font-medium"
+              className="text-sky-600 hover:text-sky-700 text-xs flex items-center mt-1 font-medium transition-colors duration-200"
             >
               {isDescriptionExpanded ? (
                 <>
@@ -124,37 +124,42 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
         </div>
         
         {totalVotes > 0 && (
-          <div className="text-sm text-center font-medium flex items-center justify-center gap-1">
-            <div className="w-full bg-secondary/30 p-2 rounded-md">
+          <div className="relative pt-2">
+            <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
+                style={{ width: `${votePercentage}%` }}
+              ></div>
+            </div>
+            <div className="mt-1 text-xs font-medium text-center text-slate-600">
               {votesForDestination} {votesForDestination === 1 ? "vote" : "votes"} ({votePercentage}%)
             </div>
           </div>
         )}
       </CardContent>
       
-      <CardFooter>
+      <CardFooter className="p-4 pt-0">
         {!isVotingClosed ? (
           <Button
             onClick={() => onVote(destination.id)}
             disabled={isVoted}
-            className={`w-full ${isVoted ? "bg-primary" : "bg-secondary hover:bg-secondary/80"}`}
-            variant={isVoted ? "default" : "outline"}
+            className={`w-full rounded-xl shadow-lg transition-all duration-200 ${
+              isVoted 
+                ? "bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-medium shadow-green-500/25" 
+                : "bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium shadow-blue-500/25"
+            }`}
           >
             {isVoted ? (
               <div className="flex items-center gap-1.5">
                 <ThumbsUpIcon size={16} />
                 <span>Voted</span>
               </div>
-            ) : "Vote"}
+            ) : "Vote for this destination"}
           </Button>
         ) : (
-          <Button
-            disabled
-            className="w-full"
-            variant="ghost"
-          >
+          <div className="w-full rounded-xl bg-slate-100 p-2 text-center text-slate-500 text-sm font-medium">
             Voting closed
-          </Button>
+          </div>
         )}
       </CardFooter>
     </Card>

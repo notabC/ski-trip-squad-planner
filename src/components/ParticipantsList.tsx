@@ -2,7 +2,7 @@ import React from "react";
 import { User, Participant, Trip } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, XCircle, AlertCircle, DollarSign } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, DollarSign, Users, CreditCard, Snowflake } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -27,21 +27,21 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     switch (status) {
       case "confirmed":
         return (
-          <div className="flex items-center gap-1.5 text-green-600 bg-green-100 px-3 py-1 rounded font-medium shadow-sm">
+          <div className="flex items-center gap-1.5 text-green-600 bg-gradient-to-r from-green-50 to-green-100 px-3 py-1 rounded-lg font-medium shadow-sm transition-all duration-200 hover:shadow-md">
             <CheckCircle className="h-4 w-4" />
             <span className="text-sm">In</span>
           </div>
         );
       case "declined":
         return (
-          <div className="flex items-center gap-1.5 text-red-600 bg-red-100 px-3 py-1 rounded font-medium shadow-sm">
+          <div className="flex items-center gap-1.5 text-red-600 bg-gradient-to-r from-red-50 to-red-100 px-3 py-1 rounded-lg font-medium shadow-sm transition-all duration-200 hover:shadow-md">
             <XCircle className="h-4 w-4" />
             <span className="text-sm">Out</span>
           </div>
         );
       default:
         return (
-          <div className="flex items-center gap-1.5 text-amber-600 bg-amber-100 px-3 py-1 rounded font-medium shadow-sm">
+          <div className="flex items-center gap-1.5 text-amber-600 bg-gradient-to-r from-amber-50 to-amber-100 px-3 py-1 rounded-lg font-medium shadow-sm transition-all duration-200 hover:shadow-md">
             <AlertCircle className="h-4 w-4" />
             <span className="text-sm">Pending</span>
           </div>
@@ -52,11 +52,11 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
   const getPaymentStatusBadge = (status: Participant["paymentStatus"]) => {
     switch (status) {
       case "paid":
-        return <Badge className="px-3 py-1 bg-green-500 hover:bg-green-600">Paid</Badge>;
+        return <Badge className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 border-0 shadow-sm text-white font-medium rounded-lg hover:shadow-md transition-all duration-200">Paid</Badge>;
       case "partially_paid":
-        return <Badge className="px-3 py-1 bg-amber-500 hover:bg-amber-600">Partial</Badge>;
+        return <Badge className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 border-0 shadow-sm text-white font-medium rounded-lg hover:shadow-md transition-all duration-200">Partial</Badge>;
       case "not_paid":
-        return <Badge className="px-3 py-1 bg-red-500 hover:bg-red-600">Not Paid</Badge>;
+        return <Badge className="px-3 py-1 bg-gradient-to-r from-red-500 to-rose-500 border-0 shadow-sm text-white font-medium rounded-lg hover:shadow-md transition-all duration-200">Not Paid</Badge>;
     }
   };
 
@@ -74,23 +74,38 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Participants ({participants.length})</CardTitle>
+    <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white/90 backdrop-blur-sm overflow-hidden">
+      <CardHeader className="bg-gradient-to-br from-sky-50 to-blue-50/50 border-b border-slate-100 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-gradient-to-br from-sky-400/20 to-blue-600/20">
+            <Users className="h-5 w-5 text-sky-600" />
+          </div>
+          <CardTitle className="text-xl font-bold bg-gradient-to-r from-sky-600 to-blue-700 bg-clip-text text-transparent">
+            Participants ({participants.length})
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="p-4 space-y-5">
         {participants.length === 0 ? (
-          <div className="text-center py-4 text-muted-foreground">
-            No participants found. This might be a bug.
+          <div className="p-12 border-2 border-dashed border-slate-200 bg-white/50 backdrop-blur-sm rounded-xl text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="p-4 rounded-full bg-gradient-to-br from-sky-400/20 to-blue-600/20">
+                <Users className="h-10 w-10 text-sky-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800">No Participants</h3>
+              <p className="text-slate-600 max-w-md mx-auto">
+                No participants found. This might be a bug or no one has joined yet.
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-slate-100">
             {sortedParticipants.map(({ user, participant }) => (
               <div
                 key={user.id}
                 className={cn(
-                  "py-3 flex flex-wrap items-center justify-between",
-                  user.id === currentUserId ? "bg-secondary/20" : ""
+                  "py-4 flex flex-wrap items-center justify-between transition-all duration-200 hover:bg-slate-50 rounded-lg px-2",
+                  user.id === currentUserId ? "bg-gradient-to-r from-sky-50 to-blue-50" : ""
                 )}
               >
                 <div className="flex items-center space-x-3">
@@ -98,10 +113,10 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                     {getStatusBadge(participant.status)}
                   </div>
                   <div>
-                    <p className="font-medium">
-                      {user.name} {user.id === currentUserId && "(You)"}
+                    <p className="font-medium text-slate-800">
+                      {user.name} {user.id === currentUserId && <span className="text-sky-600 font-semibold">(You)</span>}
                     </p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <p className="text-sm text-slate-500">{user.email}</p>
                   </div>
                 </div>
                 
@@ -116,8 +131,9 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                           size="sm"
                           variant="outline"
                           onClick={() => onUpdateStatus(user.id, "confirmed")}
-                          className="border-green-500 text-green-500 hover:bg-green-50 focus:ring-2 focus:ring-green-500/20 active:bg-green-100"
+                          className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 focus:ring-2 focus:ring-green-500/20 active:bg-green-100 font-medium rounded-lg shadow-sm hover:shadow transition-all duration-200"
                         >
+                          <CheckCircle className="h-4 w-4 mr-1" />
                           I'm In
                         </Button>
                       )}
@@ -128,8 +144,9 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                           size="sm"
                           variant="outline"
                           onClick={() => onUpdateStatus(user.id, "declined")}
-                          className="border-red-500 text-red-500 hover:bg-red-50 focus:ring-2 focus:ring-red-500/20 active:bg-red-100"
+                          className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700 focus:ring-2 focus:ring-red-500/20 active:bg-red-100 font-medium rounded-lg shadow-sm hover:shadow transition-all duration-200"
                         >
+                          <XCircle className="h-4 w-4 mr-1" />
                           I'm Out
                         </Button>
                       )}
@@ -138,11 +155,11 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                         <Button
                           size="sm"
                           onClick={() => onUpdatePayment(user.id)}
-                          className="gap-1 focus:ring-2 focus:ring-primary/20"
+                          className="gap-1 focus:ring-2 focus:ring-primary/20 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium rounded-lg shadow-lg shadow-blue-500/25 transition-all duration-200"
                         >
                           <DollarSign className="h-4 w-4" />
                           {participant.paymentStatus === "not_paid" ? 
-                            "Pay" : "Complete Payment"}
+                            "Pay Now" : "Complete Payment"}
                         </Button>
                       )}
                     </>
@@ -153,14 +170,26 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
           </div>
         )}
         
-        <div className="rounded-md bg-secondary/30 p-4">
-          <div className="flex justify-between text-sm font-medium">
-            <span>Total price per person:</span>
-            <span>${totalPrice}</span>
+        <div className="rounded-xl bg-gradient-to-br from-sky-400/10 to-blue-600/10 p-5 shadow-sm">
+          <div className="flex justify-between items-center">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-slate-800 font-medium">
+                <CreditCard className="h-4 w-4 text-sky-600" />
+                <span>Total price per person:</span>
+              </div>
+              <div className="text-xs text-slate-600">
+                Price includes accommodation, ski pass, and equipment rental
+              </div>
+            </div>
+            <div className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-blue-700 bg-clip-text text-transparent">
+              ${totalPrice}
+            </div>
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Price includes accommodation, ski pass, and equipment rental
-          </div>
+        </div>
+        
+        <div className="text-center text-xs text-slate-500 pt-2 flex items-center justify-center gap-1">
+          <Snowflake className="h-3 w-3 text-sky-500 animate-pulse" />
+          <span>Please confirm your participation to proceed with payment</span>
         </div>
       </CardContent>
     </Card>
