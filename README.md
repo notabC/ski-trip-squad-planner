@@ -2,6 +2,11 @@
 
 A collaborative web application for planning ski trips with friends. This application allows groups to vote on destinations, track participant status, and manage payments all in one place.
 
+## Deployment
+
+- **Live Demo**: [https://ski-trip-squad-planner.lovable.app](https://ski-trip-squad-planner.lovable.app)
+- **GitHub Repository**: [https://github.com/notabC/ski-trip-squad-planner](https://github.com/notabC/ski-trip-squad-planner)
+
 ## Tech Stack
 
 - **Frontend Framework**: React with TypeScript
@@ -28,7 +33,6 @@ A collaborative web application for planning ski trips with friends. This applic
   - Fetches real hotel data for ski destinations
   - Transforms API data to application format
   - Robust error handling with fallback to mock data
-  - Dynamic pricing based on resort difficulty
 
 ## Setup Instructions
 
@@ -42,7 +46,7 @@ A collaborative web application for planning ski trips with friends. This applic
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/ski-trip-squad-planner.git
+   git clone https://github.com/notabC/ski-trip-squad-planner.git
    cd ski-trip-squad-planner
    ```
 
